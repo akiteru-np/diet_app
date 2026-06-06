@@ -18,7 +18,7 @@ def get_db():
         db.close()
 
 # ========================================
-# 🏠 案内係（食材サジェスト検索＆チャージ機能付き）
+# 🏠 案内係（体重＆食事＆レシピのフルスタック統合版）
 # ========================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -28,18 +28,24 @@ def read_root():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diet App - 統合管理</title>
+    <title>Diet App - 究極統合管理</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
-        body { font-family: sans-serif; background-color: #f7f9fc; color: #333; }
-        .container { max-width: 600px; margin: 40px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #2c3e50; }
+        body { font-family: sans-serif; background-color: #f7f9fc; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 30px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; margin-top: 0; }
         .form-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
-        input { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; width: 100%; box-sizing: border-box; }
+        input, textarea { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; width: 100%; box-sizing: border-box; font-family: sans-serif; }
+        textarea { resize: vertical; height: 80px; }
         .inline-inputs { display: flex; gap: 10px; width: 100%; }
         button { padding: 10px 20px; background-color: #27ae60; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; white-space: nowrap; }
         button:hover { background-color: #2ecc71; }
+        
+        /* レシピ用の新スタイル */
+        .recipe-card { background: #f8f9fa; border-left: 5px solid #9b59b6; padding: 15px; border-radius: 6px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .recipe-title { font-weight: bold; font-size: 18px; color: #8e44ad; margin-bottom: 5px; }
+        .recipe-instructions { font-size: 14px; color: #555; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -60,7 +66,9 @@ def read_root():
             <input type="date" id="mealDateInput" onchange="fetchAndRenderPfcChart()">
             
             <input type="text" id="mealNameInput" list="ingredientOptions" placeholder="食べたもの、または食材を検索... (例: 鶏胸肉)" oninput="onIngredientSelect()">
-            <datalist id="ingredientOptions"></datalist> <div class="inline-inputs">
+            <datalist id="ingredientOptions"></datalist>
+
+            <div class="inline-inputs">
                 <input type="number" id="caloriesInput" placeholder="カロリー (kcal)">
                 <input type="number" id="proteinInput" placeholder="P (g)">
                 <input type="number" id="fatInput" placeholder="F (g)">
@@ -74,10 +82,24 @@ def read_root():
         </div>
     </div>
 
+    <div class="container">
+        <h2>📝 マイレシピ作成</h2>
+        <div class="form-group" style="flex-direction: column; gap: 10px;">
+            <input type="text" id="recipeTitleInput" placeholder="レシピ名 (例: PFC最強親子丼)">
+            <textarea id="recipeInstructionsInput" placeholder="作り方やメモ (例: 鶏胸肉200g、卵2個、玉ねぎ半分をめんつゆで煮る)"></textarea>
+            <button onclick="saveRecipe()" style="background-color: #9b59b6; width: 100%;">レシピを保存</button>
+        </div>
+        
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <h3>📔 マイレシピ一覧</h3>
+        <div id="recipeList">
+            </div>
+    </div>
+
     <script>
         let weightChart;
         let pfcChart;
-        let globalIngredients = []; // 裏側から持ってきた食材マスターを一時保存する箱
+        let globalIngredients = [];
 
         const todayStr = new Date().toISOString().split('T')[0];
         document.getElementById('dateInput').value = todayStr;
@@ -127,11 +149,8 @@ def read_root():
         async function loadIngredientsMaster() {
             const response = await fetch('/ingredients/');
             globalIngredients = await response.json();
-
             const datalist = document.getElementById('ingredientOptions');
-            datalist.innerHTML = ""; // 一旦クリア
-
-            // 食材マスターに登録されている分だけ、検索候補（option）を作る
+            datalist.innerHTML = "";
             globalIngredients.forEach(item => {
                 const option = document.createElement('option');
                 option.value = item.name;
@@ -139,14 +158,11 @@ def read_root():
             });
         }
 
-        // --- ⚡️ 検索窓で食材が選ばれたら、PFCを自動チャージする魔法 ---
+        // --- ⚡️ 食材が選ばれたらPFCを自動チャージする魔法 ---
         function onIngredientSelect() {
             const currentInput = document.getElementById('mealNameInput').value;
-            // 入力された文字が、食材マスターにある名前に完全一致するかチェック
             const matchedIngredient = globalIngredients.find(item => item.name === currentInput);
-
             if (matchedIngredient) {
-                // 一致したら、カロリーやPFCの入力欄に数字を自動チャージ！！
                 document.getElementById('caloriesInput').value = matchedIngredient.calories;
                 document.getElementById('proteinInput').value = matchedIngredient.protein;
                 document.getElementById('fatInput').value = matchedIngredient.fat;
@@ -154,7 +170,7 @@ def read_root():
             }
         }
 
-        // --- 🍩 選択された日付の食事データを集計して、PFC円グラフを描く魔法 ---
+        // --- 🍩 食事データを集計して、PFC円グラフを描く魔法 ---
         async function fetchAndRenderPfcChart() {
             const selectedDate = document.getElementById('mealDateInput').value;
             if (!selectedDate) return;
@@ -235,11 +251,62 @@ def read_root():
             }
         }
 
+        // --- 📖 裏側からレシピを読み込んで画面にカードで並べる魔法 ---
+        async function fetchAndRenderRecipes() {
+            const response = await fetch('/recipes/');
+            const recipes = await response.json();
+            
+            const recipeList = document.getElementById('recipeList');
+            recipeList.innerHTML = ""; // 一旦クリア
+
+            if (recipes.length === 0) {
+                recipeList.innerHTML = "<p style='color:#888; text-align:center;'>登録されたレシピはまだありません</p>";
+                return;
+            }
+
+            recipes.forEach(recipe => {
+                const card = document.createElement('div');
+                card.className = 'recipe-card';
+                card.innerHTML = `
+                    <div class="recipe-title">🍳 ${recipe.title}</div>
+                    <div class="recipe-instructions">${recipe.instructions || '作り方の登録はありません'}</div>
+                `;
+                recipeList.appendChild(card);
+            });
+        }
+
+        // --- 📥 新しいレシピを裏側にセーブする魔法 ---
+        async function saveRecipe() {
+            const title = document.getElementById('recipeTitleInput').value;
+            const instructions = document.getElementById('recipeInstructionsInput').value;
+
+            if (!title) { alert("レシピ名は必ず入力してください！"); return; }
+
+            const response = await fetch('/recipes/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    instructions: instructions
+                })
+            });
+
+            if (response.ok) {
+                alert("マイレシピを登録しました！");
+                document.getElementById('recipeTitleInput').value = "";
+                document.getElementById('recipeInstructionsInput').value = "";
+                fetchAndRenderRecipes(); // リストを再描画して反映
+            } else {
+                alert("レシピの登録に失敗しました。");
+            }
+        }
+
         // --- 🚀 画面が開いた瞬間にすべてを起動 ---
         window.onload = function() {
             fetchAndRenderWeightChart();
             fetchAndRenderPfcChart();
-            loadIngredientsMaster(); // 食材マスターの候補を読み込む！
+            loadIngredientsMaster();
+            fetchAndRenderRecipes(); // レシピ一覧を読み込む！
         };
     </script>
 </body>
