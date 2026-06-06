@@ -18,7 +18,7 @@ def get_db():
         db.close()
 
 # ========================================
-# 🏠 案内係（体重＆食事・PFCグラフの完全版）
+# 🏠 案内係（食材サジェスト検索＆チャージ機能付き）
 # ========================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -58,8 +58,9 @@ def read_root():
         <h2>🍳 食事・PFCダッシュボード</h2>
         <div class="form-group" style="flex-direction: column; gap: 10px;">
             <input type="date" id="mealDateInput" onchange="fetchAndRenderPfcChart()">
-            <input type="text" id="mealNameInput" placeholder="食べたものの名前 (例: 鶏胸肉炒め)">
-            <div class="inline-inputs">
+            
+            <input type="text" id="mealNameInput" list="ingredientOptions" placeholder="食べたもの、または食材を検索... (例: 鶏胸肉)" oninput="onIngredientSelect()">
+            <datalist id="ingredientOptions"></datalist> <div class="inline-inputs">
                 <input type="number" id="caloriesInput" placeholder="カロリー (kcal)">
                 <input type="number" id="proteinInput" placeholder="P (g)">
                 <input type="number" id="fatInput" placeholder="F (g)">
@@ -76,8 +77,8 @@ def read_root():
     <script>
         let weightChart;
         let pfcChart;
+        let globalIngredients = []; // 裏側から持ってきた食材マスターを一時保存する箱
 
-        // 今日の日付をカレンダーの初期値としてセットする
         const todayStr = new Date().toISOString().split('T')[0];
         document.getElementById('dateInput').value = todayStr;
         document.getElementById('mealDateInput').value = todayStr;
@@ -122,16 +123,45 @@ def read_root():
             if (response.ok) { alert("体重を登録しました！"); fetchAndRenderWeightChart(); }
         }
 
+        // --- 🔍 裏側から食材マスターを読み込んで検索候補を作る魔法 ---
+        async function loadIngredientsMaster() {
+            const response = await fetch('/ingredients/');
+            globalIngredients = await response.json();
+
+            const datalist = document.getElementById('ingredientOptions');
+            datalist.innerHTML = ""; // 一旦クリア
+
+            // 食材マスターに登録されている分だけ、検索候補（option）を作る
+            globalIngredients.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.name;
+                datalist.appendChild(option);
+            });
+        }
+
+        // --- ⚡️ 検索窓で食材が選ばれたら、PFCを自動チャージする魔法 ---
+        function onIngredientSelect() {
+            const currentInput = document.getElementById('mealNameInput').value;
+            // 入力された文字が、食材マスターにある名前に完全一致するかチェック
+            const matchedIngredient = globalIngredients.find(item => item.name === currentInput);
+
+            if (matchedIngredient) {
+                // 一致したら、カロリーやPFCの入力欄に数字を自動チャージ！！
+                document.getElementById('caloriesInput').value = matchedIngredient.calories;
+                document.getElementById('proteinInput').value = matchedIngredient.protein;
+                document.getElementById('fatInput').value = matchedIngredient.fat;
+                document.getElementById('carbsInput').value = matchedIngredient.carbs;
+            }
+        }
+
         // --- 🍩 選択された日付の食事データを集計して、PFC円グラフを描く魔法 ---
         async function fetchAndRenderPfcChart() {
             const selectedDate = document.getElementById('mealDateInput').value;
             if (!selectedDate) return;
 
-            // 全ての食事履歴を裏側から取ってくる
             const response = await fetch('/meal_histories/');
             const allMeals = await response.json();
 
-            // 選択された日付のデータだけに絞り込んで、P・F・Cの合計を計算する
             let totalP = 0, totalF = 0, totalC = 0;
             allMeals.forEach(meal => {
                 if (meal.date === selectedDate) {
@@ -144,7 +174,6 @@ def read_root():
             const ctx = document.getElementById('pfcChart').getContext('2d');
             if (pfcChart) { pfcChart.destroy(); }
 
-            // もしその日に何も食べていなければ、空っぽ用のグレーの円を出す
             if (totalP === 0 && totalF === 0 && totalC === 0) {
                 pfcChart = new Chart(ctx, {
                     type: 'doughnut',
@@ -157,14 +186,13 @@ def read_root():
                 return;
             }
 
-            // データがあれば、綺麗なPFCドーナツグラフを描く！
             pfcChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: [`タンパク質 (P): ${totalP}g`, `脂質 (F): ${totalF}g`, `炭水化物 (C): ${totalC}g`],
                     datasets: [{
                         data: [totalP, totalF, totalC],
-                        backgroundColor: ['#3498db', '#e74c3c', '#f1c40f'] // 青(P)、赤(F)、黄(C)
+                        backgroundColor: ['#3498db', '#e74c3c', '#f1c40f']
                     }]
                 },
                 options: { plugins: { title: { display: true, text: `${selectedDate} のPFCバランス` } } }
@@ -188,7 +216,7 @@ def read_root():
                 body: JSON.stringify({
                     date: date,
                     name: name,
-                    amount_g: 100, // 簡易的に100g固定
+                    amount_g: 100,
                     calories: parseFloat(calories) || 0,
                     protein: parseFloat(protein) || 0,
                     fat: parseFloat(fat) || 0,
@@ -198,23 +226,20 @@ def read_root():
 
             if (response.ok) {
                 alert("食事を記録しました！");
-                // 入力欄を綺麗に空っぽにする
                 document.getElementById('mealNameInput').value = "";
                 document.getElementById('caloriesInput').value = "";
                 document.getElementById('proteinInput').value = "";
                 document.getElementById('fatInput').value = "";
                 document.getElementById('carbsInput').value = "";
-                // グラフを最新に更新
                 fetchAndRenderPfcChart();
-            } else {
-                alert("食事の記録に失敗しました。");
             }
         }
 
-        // --- 🚀 画面が開いた瞬間に、体重グラフとPFCグラフを両方自動で描く ---
+        // --- 🚀 画面が開いた瞬間にすべてを起動 ---
         window.onload = function() {
             fetchAndRenderWeightChart();
             fetchAndRenderPfcChart();
+            loadIngredientsMaster(); // 食材マスターの候補を読み込む！
         };
     </script>
 </body>
