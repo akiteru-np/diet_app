@@ -1,11 +1,21 @@
-from sqlalchemy import Column, Integer, Float, Date
+from sqlalchemy import Column, Integer, Float, Date, String
 from database import Base
 
+# --- 体重テーブル ---
 class Weight(Base):
-    # データベースの中に作られる実際のテーブル（表）の名前
     __tablename__ = "weights"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, index=True)
+    weight = Column(Float)
 
-    # カラム（列）の定義：Step 3で一緒に考えた項目です！
-    id = Column(Integer, primary_key=True, index=True)  # 背番号（自動で番号が振られます）
-    date = Column(Date, index=True)                     # 日付
-    weight = Column(Float)                              # 体重（小数点もOKなFloat型）
+# --- 食事（Meal）テーブル ---
+class Meal(Base):
+    __tablename__ = "meals"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, index=True)
+    name = Column(String, index=True) 
+    amount_g = Column(Float)          # 👈 約束のグラム数！
+    calories = Column(Float)          
+    protein = Column(Float)           
+    fat = Column(Float)               
+    carbs = Column(Float)

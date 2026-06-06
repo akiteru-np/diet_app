@@ -1,14 +1,27 @@
 from pydantic import BaseModel
 from datetime import date
 
-# 1. 登録する時（Create）の注文票ルール
+# --- Weight (体重) ---
 class WeightCreate(BaseModel):
-    date: date      # 日付（例: 2026-06-06）
-    weight: float   # 体重（例: 65.5）
+    date: date
+    weight: float
 
-# 2. データを返す時（Read）のルール
 class WeightResponse(WeightCreate):
-    id: int         # データベースが自動でつけた背番号（ID）も一緒に返す
-
+    id: int
     class Config:
-        from_attributes = True  # DBのデータをうまく変換するための魔法のおまじない
+        from_attributes = True
+
+# --- Meal (食事) ---
+class MealCreate(BaseModel):
+    date: date
+    name: str           
+    amount_g: float     # 👈 約束のグラム数！
+    calories: float
+    protein: float
+    fat: float
+    carbs: float
+
+class MealResponse(MealCreate):
+    id: int
+    class Config:
+        from_attributes = True
