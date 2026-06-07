@@ -2,5 +2,3 @@ fastapi
 uvicorn
 sqlalchemy
 pydantic
-chartjs
-date-fns
