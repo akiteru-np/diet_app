@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 import models, schemas
 from database import engine, SessionLocal
 
-# データベースに4つのテーブルを自動生成
+# データベースにテーブルを自動生成・更新
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -28,7 +28,7 @@ def read_root():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diet App - 究極統合管理</title>
+    <title>Diet App - 究極リレーショナル管理</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
@@ -36,18 +36,25 @@ def read_root():
         .container { max-width: 600px; margin: 30px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #2c3e50; margin-top: 0; }
         .form-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
-        input, textarea { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; width: 100%; box-sizing: border-box; font-family: sans-serif; }
+        input, textarea, select { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; width: 100%; box-sizing: border-box; font-family: sans-serif; }
         textarea { resize: vertical; height: 80px; }
         .inline-inputs { display: flex; gap: 10px; width: 100%; }
         button { padding: 10px 20px; background-color: #27ae60; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; white-space: nowrap; }
         button:hover { background-color: #2ecc71; }
         
-        /* レシピ用のスタイル */
+        /* レシピ・食材の動的追加用 */
+        .ingredient-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .remove-btn { background-color: #c0392b; padding: 10px; }
+        .remove-btn:hover { background-color: #e74c3c; }
+
+        /* 本物のレシピカードスタイル */
         .recipe-card { background: #f8f9fa; border-left: 5px solid #9b59b6; padding: 15px; border-radius: 6px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .recipe-title { font-weight: bold; font-size: 18px; color: #8e44ad; margin-bottom: 5px; }
-        .recipe-instructions { font-size: 14px; color: #555; white-space: pre-wrap; }
+        .recipe-pfc { font-size: 13px; color: #2980b9; background: #eaf2f8; padding: 5px 10px; border-radius: 4px; margin: 5px 0; display: inline-block; }
+        .recipe-ingredients-list { font-size: 13px; color: #666; margin-bottom: 10px; padding-left: 20px; }
+        .recipe-instructions { font-size: 14px; color: #333; white-space: pre-wrap; border-top: 1px dashed #ddd; padding-top: 8px; }
 
-        /* 提案画面用の新スタイル（プレミアムゴールド） */
+        /* 提案画面用スタイル */
         .proposal-card { background: #fffdf0; border: 1px solid #f1c40f; border-left: 5px solid #f1c40f; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
         .proposal-title { font-weight: bold; font-size: 18px; color: #d35400; margin-bottom: 5px; }
     </style>
@@ -68,8 +75,7 @@ def read_root():
         <h2>🍳 食事・PFCダッシュボード</h2>
         <div class="form-group" style="flex-direction: column; gap: 10px;">
             <input type="date" id="mealDateInput" onchange="fetchAndRenderPfcChart()">
-            
-            <input type="text" id="mealNameInput" list="ingredientOptions" placeholder="食べたもの、または食材を検索... (例: 鶏胸肉)" oninput="onIngredientSelect()">
+            <input type="text" id="mealNameInput" list="ingredientOptions" placeholder="食べたものを検索... (食材マスターから補完)" oninput="onIngredientSelect()">
             <datalist id="ingredientOptions"></datalist>
 
             <div class="inline-inputs">
@@ -86,24 +92,32 @@ def read_root():
     </div>
 
     <div class="container">
-        <h2>📝 マイレシピ作成</h2>
+        <h2>📝 マイレシピ作成 (DB連動型)</h2>
         <div class="form-group" style="flex-direction: column; gap: 10px;">
-            <input type="text" id="recipeTitleInput" placeholder="レシピ名 (例: PFC最強親子丼)">
-            <textarea id="recipeInstructionsInput" placeholder="作り方やメモ (例: 鶏胸肉200g、卵2個、玉ねぎ半分をめんつゆで煮る)"></textarea>
-            <button onclick="saveRecipe()" style="background-color: #9b59b6; width: 100%;">レシピを保存</button>
+            <input type="text" id="recipeTitleInput" placeholder="レシピ名 (例: 沼親子丼)">
+            
+            <div id="recipeIngredientsContainer">
+                <label style="font-size: 14px; font-weight: bold; color: #7f8c8d;">🥗 使用する食材と分量</label>
+                </div>
+            <button type="button" onclick="addIngredientRow()" style="background-color: #34495e; font-size: 14px; padding: 5px 10px; margin-bottom: 10px;">＋ 食材を追加</button>
+
+            <textarea id="recipeInstructionsInput" placeholder="作り方の手順やメモ"></textarea>
+            <button onclick="saveRecipe()" style="background-color: #9b59b6; width: 100%;">レシピを保存（自動PFC計算）</button>
         </div>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        <h3>📔 マイレシピ一覧</h3>
+        <h3>📔 マイレシピ一覧 (基準カロリー自動算出)</h3>
         <div id="recipeList"></div>
     </div>
 
     <div class="container" style="border: 2px solid #f1c40f;">
-        <h2>🔍 手元にある食材からレシピ提案</h2>
+        <h2>🔍 食材マスター連動 レシピ提案</h2>
         <div class="form-group">
-            <input type="text" id="searchKeywordInput" placeholder="冷蔵庫にある食材を入力... (例: 鶏胸肉)" oninput="searchRecipes()">
+            <select id="searchIngredientSelect" onchange="searchRecipesByIngredient()">
+                <option value="">-- 冷蔵庫にある食材を選択 --</option>
+            </select>
         </div>
         <div id="proposalList">
-            <p style='color:#888; text-align:center;'>食材を入力すると、おすすめレシピが自動提案されます</p>
+            <p style='color:#888; text-align:center;'>食材を選択すると、中間テーブルを逆引きしておすすめレシピを提案します</p>
         </div>
     </div>
 
@@ -116,7 +130,7 @@ def read_root():
         document.getElementById('dateInput').value = todayStr;
         document.getElementById('mealDateInput').value = todayStr;
 
-        // --- 🏃‍♂️ 体重グラフを描く魔法 ---
+        // --- 体重管理 ---
         async function fetchAndRenderWeightChart() {
             const response = await fetch('/weights/');
             const data = await response.json();
@@ -125,20 +139,9 @@ def read_root():
             const weights = data.map(item => item.weight);
             const ctx = document.getElementById('weightChart').getContext('2d');
             if (weightChart) { weightChart.destroy(); }
-            
             weightChart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '体重 (kg)',
-                        data: weights,
-                        borderColor: '#27ae60',
-                        backgroundColor: 'rgba(39, 174, 96, 0.2)',
-                        borderWidth: 2,
-                        tension: 0.1
-                    }]
-                },
+                data: { labels: labels, datasets: [{ label: '体重 (kg)', data: weights, borderColor: '#27ae60', backgroundColor: 'rgba(39, 174, 96, 0.2)', borderWidth: 2, tension: 0.1 }] },
                 options: { scales: { x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'yyyy-MM-dd' } } }, y: { beginAtZero: false } } }
             });
         }
@@ -146,29 +149,45 @@ def read_root():
         async function saveWeight() {
             const dateInput = document.getElementById('dateInput').value;
             const weightInput = document.getElementById('weightInput').value;
-            if (!dateInput || !weightInput) { alert("日付と体重を両方入力してください！"); return; }
+            if (!dateInput || !weightInput) { alert("入力データが足りません"); return; }
             const response = await fetch('/weights/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date: dateInput, weight: parseFloat(weightInput) })
             });
-            if (response.ok) { alert("体重を登録しました！"); fetchAndRenderWeightChart(); }
+            if (response.ok) { alert("登録完了！"); fetchAndRenderWeightChart(); }
         }
 
-        // --- 🔍 食材マスター候補読み込み ---
+        // --- 食材マスターの読み込み（サジェスト＆レシピ紐付け用） ---
         async function loadIngredientsMaster() {
             const response = await fetch('/ingredients/');
             globalIngredients = await response.json();
+            
+            // 食事入力用のサジェスト設定
             const datalist = document.getElementById('ingredientOptions');
             datalist.innerHTML = "";
+            
+            // レシピ提案検索用のドロップダウン設定
+            const searchSelect = document.getElementById('searchIngredientSelect');
+            searchSelect.innerHTML = '<option value="">-- 冷蔵庫にある食材を選択 --</option>';
+
             globalIngredients.forEach(item => {
                 const option = document.createElement('option');
                 option.value = item.name;
                 datalist.appendChild(option);
+
+                const selectOpt = document.createElement('option');
+                selectOpt.value = item.id;
+                selectOpt.textContent = `${item.name} (${item.unit || 'g'}ベース)`;
+                searchSelect.appendChild(selectOpt);
             });
+
+            // レシピフォームの最初の1行を準備
+            if(document.getElementById('recipeIngredientsContainer').children.length <= 1) {
+                addIngredientRow();
+            }
         }
 
-        // --- ⚡️ 食材チャージ機能 ---
         function onIngredientSelect() {
             const currentInput = document.getElementById('mealNameInput').value;
             const matchedIngredient = globalIngredients.find(item => item.name === currentInput);
@@ -180,42 +199,28 @@ def read_root():
             }
         }
 
-        // --- 🍩 PFC円グラフを描く魔法 ---
+        // --- 食事・PFCダッシュボード ---
         async function fetchAndRenderPfcChart() {
             const selectedDate = document.getElementById('mealDateInput').value;
             if (!selectedDate) return;
-
             const response = await fetch('/meal_histories/');
             const allMeals = await response.json();
-
             let totalP = 0, totalF = 0, totalC = 0;
             allMeals.forEach(meal => {
                 if (meal.date === selectedDate) {
-                    totalP += meal.protein || 0;
-                    totalF += meal.fat || 0;
-                    totalC += meal.carbs || 0;
+                    totalP += meal.protein || 0; totalF += meal.fat || 0; totalC += meal.carbs || 0;
                 }
             });
-
             const ctx = document.getElementById('pfcChart').getContext('2d');
             if (pfcChart) { pfcChart.destroy(); }
-
             if (totalP === 0 && totalF === 0 && totalC === 0) {
-                pfcChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: { labels: ['データなし'], datasets: [{ data: [1], backgroundColor: ['#bdc3c7'] }] },
-                    options: { plugins: { title: { display: true, text: 'この日の食事データはありません' } } }
-                });
+                pfcChart = new Chart(ctx, { type: 'doughnut', data: { labels: ['データなし'], datasets: [{ data: [1], backgroundColor: ['#bdc3c7'] }] }, options: { plugins: { title: { display: true, text: '食事データなし' } } } });
                 return;
             }
-
             pfcChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: {
-                    labels: [`タンパク質 (P): ${totalP}g`, `脂質 (F): ${totalF}g`, `炭水化物 (C): ${totalC}g`],
-                    datasets: [{ data: [totalP, totalF, totalC], backgroundColor: ['#3498db', '#e74c3c', '#f1c40f'] }]
-                },
-                options: { plugins: { title: { display: true, text: `${selectedDate} のPFCバランス` } } }
+                data: { labels: [`P: ${totalP.toFixed(1)}g`, `F: ${totalF.toFixed(1)}g`, `C: ${totalC.toFixed(1)}g`], datasets: [{ data: [totalP, totalF, totalC], backgroundColor: ['#3498db', '#e74c3c', '#f1c40f'] }] },
+                options: { plugins: { title: { display: true, text: `${selectedDate} の合計PFC` } } }
             });
         }
 
@@ -226,30 +231,75 @@ def read_root():
             const protein = document.getElementById('proteinInput').value;
             const fat = document.getElementById('fatInput').value;
             const carbs = document.getElementById('carbsInput').value;
-
-            if (!date || !name) { alert("日付と食事名は必ず入力してください！"); return; }
-
+            if (!date || !name) { alert("必須項目が空です"); return; }
             const response = await fetch('/meal_histories/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: date, name: name, amount_g: 100, calories: parseFloat(calories) || 0, protein: parseFloat(protein) || 0, fat: parseFloat(fat) || 0, carbs: parseFloat(carbs) || 0 })
+            });
+            if (response.ok) { alert("食事を記録しました！"); fetchAndRenderPfcChart(); }
+        }
+
+        // --- 🥗 レシピ作成画面での食材行の動的追加・削除 ---
+        function addIngredientRow() {
+            const container = document.getElementById('recipeIngredientsContainer');
+            const row = document.createElement('div');
+            row.className = 'ingredient-row';
+            
+            let optionsHtml = globalIngredients.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+            
+            row.innerHTML = `
+                <select class="row-ingredient-id" style="flex: 2;">
+                    ${optionsHtml}
+                </select>
+                <input type="number" class="row-ingredient-amount" placeholder="分量(gまたは個)" style="flex: 1;" min="1" value="100">
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
+        }
+
+        // --- 本物のレシピ保存（中間テーブルデータを添えて） ---
+        async function saveRecipe() {
+            const title = document.getElementById('recipeTitleInput').value;
+            const instructions = document.getElementById('recipeInstructionsInput').value;
+            if (!title) { alert("レシピ名を入力してください"); return; }
+
+            // 画面上の食材入力行から、IDと分量をすべて回収する
+            const ingredientRows = document.querySelectorAll('.ingredient-row');
+            const ingredientsData = [];
+            ingredientRows.forEach(row => {
+                const ingredientId = row.querySelector('.row-ingredient-id').value;
+                const amount = row.querySelector('.row-ingredient-amount').value;
+                if(ingredientId && amount) {
+                    ingredientsData.push({
+                        ingredient_id: parseInt(ingredientId),
+                        amount: parseFloat(amount)
+                    });
+                }
+            });
+
+            const response = await fetch('/recipes/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    date: date, name: name, amount_g: 100,
-                    calories: parseFloat(calories) || 0, protein: parseFloat(protein) || 0, fat: parseFloat(fat) || 0, carbs: parseFloat(carbs) || 0
+                    title: title,
+                    instructions: instructions,
+                    ingredients: ingredientsData
                 })
             });
 
             if (response.ok) {
-                alert("食事を記録しました！");
-                document.getElementById('mealNameInput').value = "";
-                document.getElementById('caloriesInput').value = "";
-                document.getElementById('proteinInput').value = "";
-                document.getElementById('fatInput').value = "";
-                document.getElementById('carbsInput').value = "";
-                fetchAndRenderPfcChart();
+                alert("食材と紐づいた本格レシピを登録しました！");
+                document.getElementById('recipeTitleInput').value = "";
+                document.getElementById('recipeInstructionsInput').value = "";
+                // 食材入力行をリセット
+                document.getElementById('recipeIngredientsContainer').innerHTML = '<label style="font-size: 14px; font-weight: bold; color: #7f8c8d;">🥗 使用する食材と分量</label>';
+                addIngredientRow();
+                fetchAndRenderRecipes();
             }
         }
 
-        // --- 📖 レシピ一覧を描く魔法 ---
+        // --- 📖 レシピ一覧の描画（裏側で計算された総PFCを出力） ---
         async function fetchAndRenderRecipes() {
             const response = await fetch('/recipes/');
             const recipes = await response.json();
@@ -257,61 +307,55 @@ def read_root():
             recipeList.innerHTML = "";
 
             if (recipes.length === 0) {
-                recipeList.innerHTML = "<p style='color:#888; text-align:center;'>登録されたレシピはまだありません</p>";
+                recipeList.innerHTML = "<p style='color:#888; text-align:center;'>登録されたレシピはありません</p>";
                 return;
             }
 
             recipes.forEach(recipe => {
+                // 中間テーブルから紐づいた食材のテキストを作成
+                let ingTxt = recipe.ingredients.map(ri => `<li>${ri.ingredient.name}: ${ri.amount}${ri.ingredient.unit || 'g'}</li>`).join('');
+                
                 const card = document.createElement('div');
                 card.className = 'recipe-card';
                 card.innerHTML = `
                     <div class="recipe-title">🍳 ${recipe.title}</div>
-                    <div class="recipe-instructions">${recipe.instructions || '作り方の登録はありません'}</div>
+                    <div class="recipe-pfc">
+                        🔥 総計: ${recipe.total_calories.toFixed(1)} kcal | 
+                        P: ${recipe.total_protein.toFixed(1)}g | 
+                        F: ${recipe.total_fat.toFixed(1)}g | 
+                        C: ${recipe.total_carbs.toFixed(1)}g
+                    </div>
+                    <ul class="recipe-ingredients-list">
+                        ${ingTxt || '<li>紐付けられた食材はありません</li>'}
+                    </ul>
+                    <div class="recipe-instructions">${recipe.instructions || '手順なし'}</div>
                 `;
                 recipeList.appendChild(card);
             });
         }
 
-        async function saveRecipe() {
-            const title = document.getElementById('recipeTitleInput').value;
-            const instructions = document.getElementById('recipeInstructionsInput').value;
-            if (!title) { alert("レシピ名は必ず入力してください！"); return; }
-
-            const response = await fetch('/recipes/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: title, instructions: instructions })
-            });
-
-            if (response.ok) {
-                alert("マイレシピを登録しました！");
-                document.getElementById('recipeTitleInput').value = "";
-                document.getElementById('recipeInstructionsInput').value = "";
-                fetchAndRenderRecipes();
-            }
-        }
-
-        // --- 🕵️‍♂️ 食材からレシピをリアルタイム大検索する究極の魔法 ---
-        async function searchRecipes() {
-            const keyword = document.getElementById('searchKeywordInput').value.trim();
+        // --- 🕵️‍♂️ 【新・提案魔法】食材マスターのIDから中間テーブルを正確に逆引き検索 ---
+        async function searchRecipesByIngredient() {
+            const selectedIngredientId = document.getElementById('searchIngredientSelect').value;
             const proposalList = document.getElementById('proposalList');
 
-            if (!keyword) {
-                proposalList.innerHTML = "<p style='color:#888; text-align:center;'>食材を入力すると、おすすめレシピが自動提案されます</p>";
+            if (!selectedIngredientId) {
+                proposalList.innerHTML = "<p style='color:#888; text-align:center;'>食材を選択すると、中間テーブルを逆引きしておすすめレシピを提案します</p>";
                 return;
             }
 
             const response = await fetch('/recipes/');
             const recipes = await response.json();
 
+            // 中間テーブルの配列（ingredients）の中に、選んだ食材IDが含まれるレシピを厳密に抽出！
             const matchedRecipes = recipes.filter(recipe => {
-                return recipe.instructions && recipe.instructions.includes(keyword);
+                return recipe.ingredients.some(ri => ri.ingredient_id == selectedIngredientId);
             });
 
             proposalList.innerHTML = "";
 
             if (matchedRecipes.length === 0) {
-                proposalList.innerHTML = `<p style='color:#e74c3c; text-align:center;'>「${keyword}」を使うレシピはまだ登録されていません</p>`;
+                proposalList.innerHTML = `<p style='color:#e74c3c; text-align:center;'>この食材を使用するレシピはまだDBに登録されていません</p>`;
                 return;
             }
 
@@ -320,17 +364,20 @@ def read_root():
                 card.className = 'proposal-card';
                 card.innerHTML = `
                     <div class="proposal-title">💡 おすすめ：${recipe.title}</div>
+                    <div style="font-size: 13px; color: #d35400; margin-bottom: 5px; font-weight: bold;">
+                        🔥 この1食の基準値: ${recipe.total_calories.toFixed(1)} kcal (P:${recipe.total_protein.toFixed(1)}g F:${recipe.total_fat.toFixed(1)}g C:${recipe.total_carbs.toFixed(1)}g)
+                    </div>
                     <div class="recipe-instructions" style="color: #666;">${recipe.instructions}</div>
                 `;
                 proposalList.appendChild(card);
             });
         }
 
-        // --- 🚀 画面が開いた瞬間にすべてを起動 ---
-        window.onload = function() {
+        // --- 🚀 起動 ---
+        window.onload = async function() {
             fetchAndRenderWeightChart();
             fetchAndRenderPfcChart();
-            loadIngredientsMaster();
+            await loadIngredientsMaster();
             fetchAndRenderRecipes();
         };
     </script>
@@ -363,7 +410,8 @@ def create_ingredient(ingredient_data: schemas.IngredientCreate, db: Session = D
         calories=ingredient_data.calories,
         protein=ingredient_data.protein,
         fat=ingredient_data.fat,
-        carbs=ingredient_data.carbs
+        carbs=ingredient_data.carbs,
+        unit=ingredient_data.unit
     )
     db.add(db_ingredient)
     db.commit()
@@ -375,19 +423,56 @@ def read_ingredients(db: Session = Depends(get_db)):
     return db.query(models.Ingredient).all()
 
 # ========================================
-# 3. Recipe (レシピマスター)
+# 3. Recipe (レシピマスター：✨リレーショナル自動計算版)
 # ========================================
 @app.post("/recipes/", response_model=schemas.RecipeResponse)
 def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_db)):
+    # まずレシピの基本情報を保存
     db_recipe = models.Recipe(title=recipe_data.title, instructions=recipe_data.instructions)
     db.add(db_recipe)
+    db.commit()
+    db.refresh(db_recipe)
+
+    # 渡された食材リストを中間テーブル（RecipeIngredient）にガッチリ保存
+    for ing_part in recipe_data.ingredients:
+        db_ri = models.RecipeIngredient(
+            recipe_id=db_recipe.id,
+            ingredient_id=ing_part.ingredient_id,
+            amount=ing_part.amount
+        )
+        db.add(db_ri)
     db.commit()
     db.refresh(db_recipe)
     return db_recipe
 
 @app.get("/recipes/", response_model=list[schemas.RecipeResponse])
 def read_recipes(db: Session = Depends(get_db)):
-    return db.query(models.Recipe).all()
+    recipes = db.query(models.Recipe).all()
+    
+    # ✨コアロジック：各レシピを画面に返す直前に、中間テーブル経由で食材の総PFCを全自動計算！
+    for r in recipes:
+        total_cal = 0.0
+        total_p = 0.0
+        total_f = 0.0
+        total_c = 0.0
+        
+        for ri in r.ingredients:
+            ing = ri.ingredient
+            # 食材のPFCデータは通常「100g（または1個）」あたりの値なので、分量/100で掛け算する
+            # もしunitが"個"なら、そのまま個数を掛け算するロジックに調整可能。ここでは一律100基準（または個数換算）として計算
+            factor = ri.amount / 100.0 if ing.unit == "g" else ri.amount
+            
+            total_cal += (ing.calories or 0) * factor
+            total_p += (ing.protein or 0) * factor
+            total_f += (ing.fat or 0) * factor
+            total_c += (ing.carbs or 0) * factor
+            
+        r.total_calories = total_cal
+        r.total_protein = total_p
+        r.total_fat = total_f
+        r.total_carbs = total_c
+        
+    return recipes
 
 # ========================================
 # 4. MealHistory (食事履歴)
