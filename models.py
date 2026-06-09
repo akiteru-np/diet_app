@@ -2,58 +2,71 @@ from sqlalchemy import Column, Integer, Float, Date, String, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 
-# 1. Weight テーブル: 体重の推移を記録する箱
+# 1. Weight テーブル
 class Weight(Base):
     __tablename__ = "weights"
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date, index=True)
     weight = Column(Float)
 
-# 2. Ingredient テーブル: 食材のマスターデータを保管する箱
+# 2. Ingredient テーブル
 class Ingredient(Base):
     __tablename__ = "ingredients"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)    # 食材名（例：鶏むね肉）
-    calories = Column(Float)             # 100g(または1個)あたりのカロリー
-    protein = Column(Float)              # 100g(または1個)あたりのタンパク質
-    fat = Column(Float)                  # 100g(または1個)あたりの脂質
-    carbs = Column(Float)                # 100g(wagon1個)あたりの炭水化物
-    unit = Column(String, default="g")   # ✨追加：単位の識別（"g"ベースか、"個"ベースか）
-
-    # レシピ中間テーブルとの結びつき
+    name = Column(String, index=True)
+    calories = Column(Float)
+    protein = Column(Float)
+    fat = Column(Float)
+    carbs = Column(Float)
+    unit = Column(String, default="g")
+    
     recipes = relationship("RecipeIngredient", back_populates="ingredient")
 
-# 3. Recipe テーブル: レシピのタイトルや作り方を保管する箱
+# 3. Recipe テーブル
 class Recipe(Base):
     __tablename__ = "recipes"
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)   # レシピ名
-    instructions = Column(Text)          # 作り方の手順など
-
-    # ✨紐付け：このレシピに含まれる食材たち（中間テーブル経由）
+    title = Column(String, index=True)
+    instructions = Column(Text)
+    
     ingredients = relationship("RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan")
 
-# ⭐️ 3.5 RecipeIngredient テーブル: 【新設】レシピと食材を繋ぐ中間テーブル
+    # ✨修正：モデル自身にPFCの自動計算能力（プロパティ）を持たせる！
+    @property
+    def total_calories(self):
+        return sum((ri.ingredient.calories or 0) * (ri.amount / 100.0 if ri.ingredient.unit == "g" else ri.amount) for ri in self.ingredients if ri.ingredient)
+
+    @property
+    def total_protein(self):
+        return sum((ri.ingredient.protein or 0) * (ri.amount / 100.0 if ri.ingredient.unit == "g" else ri.amount) for ri in self.ingredients if ri.ingredient)
+
+    @property
+    def total_fat(self):
+        return sum((ri.ingredient.fat or 0) * (ri.amount / 100.0 if ri.ingredient.unit == "g" else ri.amount) for ri in self.ingredients if ri.ingredient)
+
+    @property
+    def total_carbs(self):
+        return sum((ri.ingredient.carbs or 0) * (ri.amount / 100.0 if ri.ingredient.unit == "g" else ri.amount) for ri in self.ingredients if ri.ingredient)
+
+# 3.5 RecipeIngredient テーブル
 class RecipeIngredient(Base):
     __tablename__ = "recipe_ingredients"
     id = Column(Integer, primary_key=True, index=True)
     recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"))
     ingredient_id = Column(Integer, ForeignKey("ingredients.id", ondelete="CASCADE"))
-    amount = Column(Float)               # そのレシピで使う数量（g数や個数）
-
-    # 互いのデータに一瞬でアクセスするためのリレーション
+    amount = Column(Float)
+    
     recipe = relationship("Recipe", back_populates="ingredients")
     ingredient = relationship("Ingredient", back_populates="recipes")
 
-# 4. MealHistory テーブル: いつ、何を食べて、どれくらい摂取したかを記録する箱
+# 4. MealHistory テーブル
 class MealHistory(Base):
-    __shadow__ = "meal_histories"
     __tablename__ = "meal_histories"
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, index=True)      # 食べた日
-    name = Column(String)                # 食べたもの（レシピ名や食材名）
-    amount_g = Column(Float)             # 食べた量（グラムまたは個数換算）
-    calories = Column(Float)             # 実際に摂取したカロリー（自動計算値が入る）
-    protein = Column(Float)              # 実際に摂取したタンパク質
-    fat = Column(Float)                  # 実際に摂取した脂質
-    carbs = Column(Float)                # 実際に摂取した炭水化物
+    date = Column(Date, index=True)
+    name = Column(String)
+    amount_g = Column(Float)
+    calories = Column(Float)
+    protein = Column(Float)
+    fat = Column(Float)
+    carbs = Column(Float)

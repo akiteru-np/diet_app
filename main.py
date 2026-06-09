@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from typing import Optional
+from datetime import date
 import models, schemas
 from database import engine, SessionLocal
 
@@ -427,13 +429,11 @@ def read_ingredients(db: Session = Depends(get_db)):
 # ========================================
 @app.post("/recipes/", response_model=schemas.RecipeResponse)
 def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_db)):
-    # まずレシピの基本情報を保存
     db_recipe = models.Recipe(title=recipe_data.title, instructions=recipe_data.instructions)
     db.add(db_recipe)
     db.commit()
     db.refresh(db_recipe)
 
-    # 渡された食材リストを中間テーブル（RecipeIngredient）にガッチリ保存
     for ing_part in recipe_data.ingredients:
         db_ri = models.RecipeIngredient(
             recipe_id=db_recipe.id,
@@ -447,32 +447,8 @@ def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_d
 
 @app.get("/recipes/", response_model=list[schemas.RecipeResponse])
 def read_recipes(db: Session = Depends(get_db)):
-    recipes = db.query(models.Recipe).all()
-    
-    # ✨コアロジック：各レシピを画面に返す直前に、中間テーブル経由で食材の総PFCを全自動計算！
-    for r in recipes:
-        total_cal = 0.0
-        total_p = 0.0
-        total_f = 0.0
-        total_c = 0.0
-        
-        for ri in r.ingredients:
-            ing = ri.ingredient
-            # 食材のPFCデータは通常「100g（または1個）」あたりの値なので、分量/100で掛け算する
-            # もしunitが"個"なら、そのまま個数を掛け算するロジックに調整可能。ここでは一律100基準（または個数換算）として計算
-            factor = ri.amount / 100.0 if ing.unit == "g" else ri.amount
-            
-            total_cal += (ing.calories or 0) * factor
-            total_p += (ing.protein or 0) * factor
-            total_f += (ing.fat or 0) * factor
-            total_c += (ing.carbs or 0) * factor
-            
-        r.total_calories = total_cal
-        r.total_protein = total_p
-        r.total_fat = total_f
-        r.total_carbs = total_c
-        
-    return recipes
+    # ✨修正：models.pyの自動計算プロパティのおかげで、ここの手動計算ループが不要になりました！超スッキリ！
+    return db.query(models.Recipe).all()
 
 # ========================================
 # 4. MealHistory (食事履歴)
@@ -493,16 +469,21 @@ def create_meal_history(meal_data: schemas.MealHistoryCreate, db: Session = Depe
     db.refresh(db_meal)
     return db_meal
 
+# ✨修正：全件取得によるフリーズを防ぐため、日付（date）で絞り込めるように改良！
 @app.get("/meal_histories/", response_model=list[schemas.MealHistoryResponse])
-def read_meal_histories(db: Session = Depends(get_db)):
-    return db.query(models.MealHistory).all()
+def read_meal_histories(date: Optional[date] = None, db: Session = Depends(get_db)):
+    query = db.query(models.MealHistory)
+    if date:
+        query = query.filter(models.MealHistory.date == date)
+    return query.all()
 
 # --- 🧹 食事履歴の削除API ---
 @app.delete("/meals/{meal_id}")
 def delete_meal(meal_id: int, db: Session = Depends(get_db)):
     db_meal = db.query(models.MealHistory).filter(models.MealHistory.id == meal_id).first()
     if not db_meal:
-        return {"error": "Meal not found"}
+        # ✨修正：エラー時は200ではなく、正しいHTTPステータスコード（404）を返す！
+        raise HTTPException(status_code=404, detail="Meal not found")
     
     db.delete(db_meal)
     db.commit()
