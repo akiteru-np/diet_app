@@ -7,168 +7,367 @@
   <meta name="Generator" content="Cocoa HTML Writer">
   <meta name="CocoaVersion" content="2685.4">
   <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #000000}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #000000; min-height: 14.0px}
+    span.s1 {font-kerning: none}
   </style>
 </head>
 <body>
-<p class="p1">&lt;!DOCTYPE html&gt;</p>
-<p class="p1">&lt;html lang="ja"&gt;</p>
-<p class="p1">&lt;head&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;title&gt;Diet App - 体重管理 (Delete完備)&lt;/title&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.jsdelivr.net/npm/chart.js"&gt;&lt;/script&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"&gt;&lt;/script&gt;</p>
-<p class="p2"><span class="Apple-converted-space">    </span></p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;style&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>body { font-family: sans-serif; background-color: #f7f9fc; color: #333; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.container { max-width: 600px; margin: 40px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>h2 { text-align: center; color: #2c3e50; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.form-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>input { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>button { padding: 10px 20px; background-color: #27ae60; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>button:hover { background-color: #2ecc71; }</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>/* 🧹 削除機能用のリストスタイル */</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-list { list-style: none; padding: 0; max-height: 150px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; margin-bottom: 20px; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; background: #fff; font-size: 14px; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.data-item:last-child { border-bottom: none; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.delete-btn { background-color: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }</p>
-<p class="p1"><span class="Apple-converted-space">        </span>.delete-btn:hover { background-color: #c0392b; }</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/style&gt;</p>
-<p class="p1">&lt;/head&gt;</p>
-<p class="p1">&lt;body&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📊 体重ダッシュボード&lt;/h2&gt;</p>
-<p class="p2"><span class="Apple-converted-space">        </span></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;div class="form-group"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;input type="date" id="dateInput"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;input type="number" id="weightInput" step="0.1" placeholder="体重 (kg)"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>&lt;button onclick="saveWeight()"&gt;登録&lt;/button&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;label style="font-size: 13px; font-weight: bold; color: #7f8c8d;"&gt;🗑️ 履歴の管理（クリックで消去）&lt;/label&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;ul id="weightDataList" class="data-list"&gt;&lt;/ul&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;canvas id="weightChart"&gt;&lt;/canvas&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;script&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>let weightChart; // グラフのデータを入れおく箱</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>// ① ページが開かれたら、裏側からデータを取ってきてグラフと管理リストを描く命令</p>
-<p class="p1"><span class="Apple-converted-space">        </span>async function fetchAndRenderChart() {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>// Render上の本番API（またはローカルAPI）にアクセスしてデータをもらう</p>
-<p class="p1"><span class="Apple-converted-space">            </span>// ※index.htmlを直接開く場合、URLのドメインをRenderのURLにする必要があります</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const baseUrl = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" ? "" : "https://diet-app-pfc.onrender.com";</p>
-<p class="p2"><span class="Apple-converted-space">            </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>const response = await fetch(`${baseUrl}/weights/`);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const data = await response.json();</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>// 日付順に並び替え</p>
-<p class="p1"><span class="Apple-converted-space">            </span>data.sort((a, b) =&gt; new Date(a.date) - new Date(b.date));</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>// 🗂️ 画面上のミニ管理リストを更新</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const listContainer = document.getElementById('weightDataList');</p>
-<p class="p1"><span class="Apple-converted-space">            </span>listContainer.innerHTML = '';</p>
-<p class="p1"><span class="Apple-converted-space">            </span>data.forEach(item =&gt; {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>const li = document.createElement('li');</p>
-<p class="p1"><span class="Apple-converted-space">                </span>li.className = 'data-item';</p>
-<p class="p1"><span class="Apple-converted-space">                </span>li.innerHTML = `</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;span&gt;📅 ${item.date} : &lt;strong&gt;${item.weight} kg&lt;/strong&gt;&lt;/span&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>&lt;button class="delete-btn" onclick="deleteWeight(${item.id})"&gt;🗑️ 削除&lt;/button&gt;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>`;</p>
-<p class="p1"><span class="Apple-converted-space">                </span>listContainer.appendChild(li);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>});</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>// グラフ用の「日付リスト」と「体重リスト」を作る</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const labels = data.map(item =&gt; item.date);</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const weights = data.map(item =&gt; item.weight);</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>// グラフを描く画用紙の準備</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const ctx = document.getElementById('weightChart').getContext('2d');</p>
-<p class="p2"><span class="Apple-converted-space">            </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>// 古いグラフがあったら一旦消す（更新するため）</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (weightChart) {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>weightChart.destroy();</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>// 新しい折れ線グラフを描く！</p>
-<p class="p1"><span class="Apple-converted-space">            </span>weightChart = new Chart(ctx, {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>type: 'line',</p>
-<p class="p1"><span class="Apple-converted-space">                </span>data: {</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>labels: labels,</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>datasets: [{</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>label: '体重 (kg)',</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>data: weights,</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>borderColor: '#27ae60', <span class="Apple-converted-space">      </span>// 線の色（緑）</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>backgroundColor: 'rgba(39, 174, 96, 0.2)', // 線のしたの塗りつぶし色</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>borderWidth: 2,</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>tension: 0.1 // 少し曲線をなめらかにする</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>}]</p>
-<p class="p1"><span class="Apple-converted-space">                </span>},</p>
-<p class="p1"><span class="Apple-converted-space">                </span>options: {</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>scales: {</p>
-<p class="p1"><span class="Apple-converted-space">                        </span>y: { beginAtZero: false } // 体重なので0kgから始めない設定</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>}</p>
-<p class="p1"><span class="Apple-converted-space">                </span>}</p>
-<p class="p1"><span class="Apple-converted-space">            </span>});</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>// ② 「登録」ボタンが押された時の命令</p>
-<p class="p1"><span class="Apple-converted-space">        </span>async function saveWeight() {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const dateInput = document.getElementById('dateInput').value;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>const weightInput = document.getElementById('weightInput').value;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (!dateInput || !weightInput) {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>alert("日付と体重を両方入力してください！");</p>
-<p class="p1"><span class="Apple-converted-space">                </span>return;</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>const baseUrl = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" ? "" : "https://diet-app-pfc.onrender.com";</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>const response = await fetch(`${baseUrl}/weights/`, {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>method: 'POST',</p>
-<p class="p1"><span class="Apple-converted-space">                </span>headers: { 'Content-Type': 'application/json' },</p>
-<p class="p1"><span class="Apple-converted-space">                </span>body: JSON.stringify({</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>date: dateInput,</p>
-<p class="p1"><span class="Apple-converted-space">                    </span>weight: parseFloat(weightInput)</p>
-<p class="p1"><span class="Apple-converted-space">                </span>})</p>
-<p class="p1"><span class="Apple-converted-space">            </span>});</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (response.ok) {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>alert("登録しました！");</p>
-<p class="p1"><span class="Apple-converted-space">                </span>fetchAndRenderChart();<span class="Apple-converted-space"> </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>} else {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>alert("エラーが発生しました。");</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>// 🗑️ ③ 【新機能】ゴミ箱ボタンを押した時に裏側へ削除命令を飛ばす魔法</p>
-<p class="p1"><span class="Apple-converted-space">        </span>async function deleteWeight(id) {</p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (!confirm("本当にこの体重データを削除しますか？")) return;</p>
-<p class="p2"><span class="Apple-converted-space">            </span></p>
-<p class="p1"><span class="Apple-converted-space">            </span>const baseUrl = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" ? "" : "https://diet-app-pfc.onrender.com";</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>const response = await fetch(`${baseUrl}/weights/${id}`, {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>method: 'DELETE'</p>
-<p class="p1"><span class="Apple-converted-space">            </span>});</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">            </span>if (response.ok) {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>alert("データベースから削除しました！");</p>
-<p class="p1"><span class="Apple-converted-space">                </span>fetchAndRenderChart(); // グラフとリストを再描画</p>
-<p class="p1"><span class="Apple-converted-space">            </span>} else {</p>
-<p class="p1"><span class="Apple-converted-space">                </span>alert("削除に失敗しました。");</p>
-<p class="p1"><span class="Apple-converted-space">            </span>}</p>
-<p class="p1"><span class="Apple-converted-space">        </span>}</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">        </span>// ④ 画面が開いた瞬間に自動で実行</p>
-<p class="p1"><span class="Apple-converted-space">        </span>window.onload = fetchAndRenderChart;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</p>
-<p class="p2"><br></p>
-<p class="p1">&lt;/body&gt;</p>
-<p class="p1">&lt;/html&gt;</p>
+<p class="p1"><span class="s1">&lt;!DOCTYPE html&gt;</span></p>
+<p class="p1"><span class="s1">&lt;html lang="ja"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;head&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;title&gt;Diet App - 究極リレーショナル管理&lt;/title&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.jsdelivr.net/npm/chart.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;style&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>body { font-family: sans-serif; background-color: #f7f9fc; color: #333; margin: 0; padding: 20px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.container { max-width: 600px; margin: 30px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>h2 { text-align: center; color: #2c3e50; margin-top: 0; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.form-group { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>input, textarea, select { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; width: 100%; box-sizing: border-box; font-family: sans-serif; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>textarea { resize: vertical; height: 80px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.inline-inputs { display: flex; gap: 10px; width: 100%; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>button { padding: 10px 20px; background-color: #27ae60; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; white-space: nowrap; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>button:hover { background-color: #2ecc71; }</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">        </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.ingredient-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.remove-btn { background-color: #c0392b; padding: 10px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.remove-btn:hover { background-color: #e74c3c; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.recipe-card { background: #f8f9fa; border-left: 5px solid #9b59b6; padding: 15px; border-radius: 6px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.recipe-title { font-weight: bold; font-size: 18px; color: #8e44ad; margin-bottom: 5px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.recipe-pfc { font-size: 13px; color: #2980b9; background: #eaf2f8; padding: 5px 10px; border-radius: 4px; margin: 5px 0; display: inline-block; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.recipe-ingredients-list { font-size: 13px; color: #666; margin-bottom: 10px; padding-left: 20px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.recipe-instructions { font-size: 14px; color: #333; white-space: pre-wrap; border-top: 1px dashed #ddd; padding-top: 8px; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.proposal-card { background: #fffdf0; border: 1px solid #f1c40f; border-left: 5px solid #f1c40f; padding: 15px; border-radius: 6px; margin-bottom: 15px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.proposal-title { font-weight: bold; font-size: 18px; color: #d35400; margin-bottom: 5px; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.data-list { list-style: none; padding: 0; max-height: 150px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; margin-bottom: 20px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.data-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; background: #fff; font-size: 14px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.data-item:last-child { border-bottom: none; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.delete-btn { background-color: #e74c3c; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>.delete-btn:hover { background-color: #c0392b; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/style&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;body&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📊 体重ダッシュボード&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="form-group"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="date" id="dateInput" style="max-width: 150px;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="number" id="weightInput" step="0.1" placeholder="体重 (kg)"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="saveWeight()"&gt;登録&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">        </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;label style="font-size: 13px; font-weight: bold; color: #7f8c8d;"&gt;🗑️ 履歴の管理（クリックで消去）&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;ul id="weightDataList" class="data-list"&gt;&lt;/ul&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;canvas id="weightChart"&gt;&lt;/canvas&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;🍳 食事・PFCダッシュボード&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="form-group" style="flex-direction: column; gap: 10px;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="date" id="mealDateInput" onchange="fetchAndRenderPfcChart()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="text" id="mealNameInput" list="ingredientOptions" placeholder="食べたものを検索... (食材マスターから補完)" oninput="onIngredientSelect()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;datalist id="ingredientOptions"&gt;&lt;/datalist&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="inline-inputs"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="number" id="caloriesInput" placeholder="カロリー (kcal)"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="number" id="proteinInput" placeholder="P (g)"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="number" id="fatInput" placeholder="F (g)"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="number" id="carbsInput" placeholder="C (g)"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="saveMeal()" style="background-color: #e67e22; width: 100%;"&gt;食事を記録&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div style="max-width: 300px; margin: 0 auto;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;canvas id="pfcChart"&gt;&lt;/canvas&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📝 マイレシピ作成 (DB連動型)&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="form-group" style="flex-direction: column; gap: 10px;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="text" id="recipeTitleInput" placeholder="レシピ名 (例: 沼親子丼)"&gt;</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">            </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div id="recipeIngredientsContainer"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label style="font-size: 14px; font-weight: bold; color: #7f8c8d;"&gt;🥗 使用する食材と分量&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button type="button" onclick="addIngredientRow()" style="background-color: #34495e; font-size: 14px; padding: 5px 10px; margin-bottom: 10px;"&gt;＋ 食材を追加&lt;/button&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;textarea id="recipeInstructionsInput" placeholder="作り方の手順やメモ"&gt;&lt;/textarea&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="saveRecipe()" style="background-color: #9b59b6; width: 100%;"&gt;レシピを保存（自動PFC計算）&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3&gt;📔 マイレシピ一覧 (基準カロリー自動算出)&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="recipeList"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="container" style="border: 2px solid #f1c40f;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;🔍 食材マスター連動 レシピ提案&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="form-group"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;select id="searchIngredientSelect" onchange="searchRecipesByIngredient()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;option value=""&gt;-- 冷蔵庫にある食材を選択 --&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="proposalList"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p style='color:#888; text-align:center;'&gt;食材を選択すると、中間テーブルを逆引きしておすすめレシピを提案します&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let weightChart;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let pfcChart;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let globalIngredients = [];</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const todayStr = new Date().toISOString().split('T')[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('dateInput').value = todayStr;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById('mealDateInput').value = todayStr;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// --- 体重管理 ---</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function fetchAndRenderWeightChart() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch('/weights/');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const data = await response.json();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>data.sort((a, b) =&gt; new Date(a.date) - new Date(b.date));</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">            </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const listContainer = document.getElementById('weightDataList');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>listContainer.innerHTML = '';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>data.forEach(item =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const li = document.createElement('li');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>li.className = 'data-item';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>li.innerHTML = `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;span&gt;📅 ${item.date} : &lt;strong&gt;${item.weight} kg&lt;/strong&gt;&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;button class="delete-btn" onclick="deleteWeight(${item.id})"&gt;🗑️ 削除&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>listContainer.appendChild(li);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const labels = data.map(item =&gt; item.date);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const weights = data.map(item =&gt; item.weight);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const ctx = document.getElementById('weightChart').getContext('2d');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (weightChart) { weightChart.destroy(); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>weightChart = new Chart(ctx, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>type: 'line',</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>data: { labels: labels, datasets: [{ label: '体重 (kg)', data: weights, borderColor: '#27ae60', backgroundColor: 'rgba(39, 174, 96, 0.2)', borderWidth: 2, tension: 0.1 }] },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>options: { scales: { x: { type: 'time', time: { unit: 'day', displayFormats: { day: 'yyyy-MM-dd' } } }, y: { beginAtZero: false } } }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function saveWeight() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const dateInput = document.getElementById('dateInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const weightInput = document.getElementById('weightInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!dateInput || !weightInput) { alert("入力データが足りません"); return; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch('/weights/', {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>method: 'POST',</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>headers: { 'Content-Type': 'application/json' },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>body: JSON.stringify({ date: dateInput, weight: parseFloat(weightInput) })</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (response.ok) { alert("登録完了！"); fetchAndRenderWeightChart(); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function deleteWeight(id) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!confirm("本当にこの体重データを削除しますか？")) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch(`/weights/${id}`, { method: 'DELETE' });</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (response.ok) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>alert("データベースから削除しました！");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>fetchAndRenderWeightChart();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>alert("削除に失敗しました。");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// --- 食材マスターの読み込み ---</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function loadIngredientsMaster() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch('/ingredients/');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>globalIngredients = await response.json();</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">            </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const datalist = document.getElementById('ingredientOptions');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>datalist.innerHTML = "";</span></p>
+<p class="p2"><span class="s1"><span class="Apple-converted-space">            </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const searchSelect = document.getElementById('searchIngredientSelect');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>searchSelect.innerHTML = '&lt;option value=""&gt;-- 冷蔵庫にある食材を選択 --&lt;/option&gt;';</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>globalIngredients.forEach(item =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const option = document.createElement('option');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>option.value = item.name;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>datalist.appendChild(option);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const selectOpt = document.createElement('option');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>selectOpt.value = item.id;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>selectOpt.textContent = `${item.name} (${item.unit || 'g'}ベース)`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>searchSelect.appendChild(selectOpt);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if(document.getElementById('recipeIngredientsContainer').children.length &lt;= 1) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>addIngredientRow();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>function onIngredientSelect() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const currentInput = document.getElementById('mealNameInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const matchedIngredient = globalIngredients.find(item =&gt; item.name === currentInput);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (matchedIngredient) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('caloriesInput').value = matchedIngredient.calories;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('proteinInput').value = matchedIngredient.protein;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('fatInput').value = matchedIngredient.fat;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('carbsInput').value = matchedIngredient.carbs;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// --- 食事・PFCダッシュボード ---</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function fetchAndRenderPfcChart() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const selectedDate = document.getElementById('mealDateInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!selectedDate) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch(`/meal_histories/?date=${selectedDate}`);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const meals = await response.json();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let totalP = 0, totalF = 0, totalC = 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>meals.forEach(meal =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>totalP += meal.protein || 0; totalF += meal.fat || 0; totalC += meal.carbs || 0;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const ctx = document.getElementById('pfcChart').getContext('2d');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (pfcChart) { pfcChart.destroy(); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (totalP === 0 &amp;&amp; totalF === 0 &amp;&amp; totalC === 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>pfcChart = new Chart(ctx, { type: 'doughnut', data: { labels: ['データなし'], datasets: [{ data: [1], backgroundColor: ['#bdc3c7'] }] }, options: { plugins: { title: { display: true, text: '食事データなし' } } } });</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>pfcChart = new Chart(ctx, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>type: 'doughnut',</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>data: { labels: [`P: ${totalP.toFixed(1)}g`, `F: ${totalF.toFixed(1)}g`, `C: ${totalC.toFixed(1)}g`], datasets: [{ data: [totalP, totalF, totalC], backgroundColor: ['#3498db', '#e74c3c', '#f1c40f'] }] },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>options: { plugins: { title: { display: true, text: `${selectedDate} の合計PFC` } } }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function saveMeal() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const date = document.getElementById('mealDateInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const name = document.getElementById('mealNameInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const calories = document.getElementById('caloriesInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const protein = document.getElementById('proteinInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const fat = document.getElementById('fatInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const carbs = document.getElementById('carbsInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!date || !name) { alert("必須項目が空です"); return; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch('/meal_histories/', {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>method: 'POST',</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>headers: { 'Content-Type': 'application/json' },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>body: JSON.stringify({ date: date, name: name, amount_g: 100, calories: parseFloat(calories) || 0, protein: parseFloat(protein) || 0, fat: parseFloat(fat) || 0, carbs: parseFloat(carbs) || 0 })</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (response.ok) { alert("食事を記録しました！"); fetchAndRenderPfcChart(); }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// --- 🥗 レシピ作成画面 ---</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>function addIngredientRow() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const container = document.getElementById('recipeIngredientsContainer');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const row = document.createElement('div');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>row.className = 'ingredient-row';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let optionsHtml = globalIngredients.map(item =&gt; `&lt;option value="${item.id}"&gt;${item.name}&lt;/option&gt;`).join('');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>row.innerHTML = `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;select class="row-ingredient-id" style="flex: 2;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>${optionsHtml}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="number" class="row-ingredient-amount" placeholder="分量(gまたは個)" style="flex: 1;" min="1" value="100"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;button type="button" class="remove-btn" onclick="this.parentElement.remove()"&gt;✕&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>container.appendChild(row);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function saveRecipe() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const title = document.getElementById('recipeTitleInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const instructions = document.getElementById('recipeInstructionsInput').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!title) { alert("レシピ名を入力してください"); return; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const ingredientRows = document.querySelectorAll('.ingredient-row');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const ingredientsData = [];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>ingredientRows.forEach(row =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const ingredientId = row.querySelector('.row-ingredient-id').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const amount = row.querySelector('.row-ingredient-amount').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>if(ingredientId &amp;&amp; amount) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>ingredientsData.push({ ingredient_id: parseInt(ingredientId), amount: parseFloat(amount) });</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch('/recipes/', {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>method: 'POST',</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>headers: { 'Content-Type': 'application/json' },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>body: JSON.stringify({ title: title, instructions: instructions, ingredients: ingredientsData })</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (response.ok) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>alert("食材と紐づいた本格レシピを登録しました！");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('recipeTitleInput').value = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('recipeInstructionsInput').value = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>document.getElementById('recipeIngredientsContainer').innerHTML = '&lt;label style="font-size: 14px; font-weight: bold; color: #7f8c8d;"&gt;🥗 使用する食材と分量&lt;/label&gt;';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>addIngredientRow();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>fetchAndRenderRecipes();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function fetchAndRenderRecipes() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch('/recipes/');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const recipes = await response.json();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const recipeList = document.getElementById('recipeList');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>recipeList.innerHTML = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (recipes.length === 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>recipeList.innerHTML = "&lt;p style='color:#888; text-align:center;'&gt;登録されたレシピはありません&lt;/p&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>recipes.forEach(recipe =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>let ingTxt = recipe.ingredients.map(ri =&gt; `&lt;li&gt;${ri.ingredient.name}: ${ri.amount}${ri.ingredient.unit || 'g'}&lt;/li&gt;`).join('');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const card = document.createElement('div');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>card.className = 'recipe-card';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>card.innerHTML = `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;div class="recipe-title"&gt;🍳 ${recipe.title}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;div class="recipe-pfc"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>🔥 総計: ${recipe.total_calories.toFixed(1)} kcal |<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>P: ${recipe.total_protein.toFixed(1)}g |<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>F: ${recipe.total_fat.toFixed(1)}g |<span class="Apple-converted-space"> </span></span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>C: ${recipe.total_carbs.toFixed(1)}g</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;ul class="recipe-ingredients-list"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>${ingTxt || '&lt;li&gt;紐付けられた食材はありません&lt;/li&gt;'}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/ul&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;div class="recipe-instructions"&gt;${recipe.instructions || '手順なし'}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>recipeList.appendChild(card);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>async function searchRecipesByIngredient() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const selectedIngredientId = document.getElementById('searchIngredientSelect').value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const proposalList = document.getElementById('proposalList');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (!selectedIngredientId) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>proposalList.innerHTML = "&lt;p style='color:#888; text-align:center;'&gt;食材を選択すると、中間テーブルを逆引きしておすすめレシピを提案します&lt;/p&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const response = await fetch('/recipes/');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const recipes = await response.json();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>const matchedRecipes = recipes.filter(recipe =&gt; recipe.ingredients.some(ri =&gt; ri.ingredient_id == selectedIngredientId));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>proposalList.innerHTML = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (matchedRecipes.length === 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>proposalList.innerHTML = `&lt;p style='color:#e74c3c; text-align:center;'&gt;この食材を使用するレシピはまだDBに登録されていません&lt;/p&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>matchedRecipes.forEach(recipe =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const card = document.createElement('div');</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>card.className = 'proposal-card';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>card.innerHTML = `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;div class="proposal-title"&gt;💡 おすすめ：${recipe.title}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;div style="font-size: 13px; color: #d35400; margin-bottom: 5px; font-weight: bold;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>🔥 この1食の基準値: ${recipe.total_calories.toFixed(1)} kcal (P:${recipe.total_protein.toFixed(1)}g F:${recipe.total_fat.toFixed(1)}g C:${recipe.total_carbs.toFixed(1)}g)</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;div class="recipe-instructions" style="color: #666;"&gt;${recipe.instructions}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>proposalList.appendChild(card);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>// --- 🚀 起動 ---</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>window.onload = async function() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>fetchAndRenderWeightChart();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>fetchAndRenderPfcChart();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>await loadIngredientsMaster();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>fetchAndRenderRecipes();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
 </body>
 </html>
