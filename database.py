@@ -3,13 +3,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# 🔽 Renderの環境変数からURLを安全に読み込みます！
 SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=3600,
+    execution_options={"no_parameters": True},  # プリペアドステートメント無効化
     connect_args={
         "sslmode": "require",
         "keepalives": 1,
