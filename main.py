@@ -496,3 +496,14 @@ def create_meal_history(meal_data: schemas.MealHistoryCreate, db: Session = Depe
 @app.get("/meal_histories/", response_model=list[schemas.MealHistoryResponse])
 def read_meal_histories(db: Session = Depends(get_db)):
     return db.query(models.MealHistory).all()
+
+# --- 🧹 食事履歴の削除API ---
+@app.delete("/meals/{meal_id}")
+def delete_meal(meal_id: int, db: Session = Depends(get_db)):
+    db_meal = db.query(models.MealHistory).filter(models.MealHistory.id == meal_id).first()
+    if not db_meal:
+        return {"error": "Meal not found"}
+    
+    db.delete(db_meal)
+    db.commit()
+    return {"status": "success", "message": f"Meal {meal_id} deleted"}
