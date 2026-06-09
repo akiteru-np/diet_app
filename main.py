@@ -28,9 +28,8 @@ def get_db():
 # ========================================
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
-    # もうここにベタ書きしません。templates/index.html を読み込みます！
-    return templates.TemplateResponse("index.html", {"request": request})
-
+    # ✨ 最新ルール！名前をハッキリ指定して渡すことで誤解を完全ブロック！
+    return templates.TemplateResponse(request=request, name="index.html")
 # ========================================
 # 1. Weight (体重管理)
 # ========================================
