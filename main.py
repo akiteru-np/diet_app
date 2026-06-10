@@ -27,13 +27,11 @@ def get_db():
 # 🏠 案内係（スッキリ分離版！）
 # ========================================
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request):
-    # ✨ media_type="text/html" を追加して、強制的にWebページとして表示させます！
-    return templates.TemplateResponse(
-        request=request, 
-        name="index.html", 
-        media_type="text/html"
-    )
+def read_root():
+    # 枠組みの自動判定に頼らず、index.htmlを直接読み込んで強制的にHTMLとして送り返します！
+    with open("templates/index.html", "r", encoding="utf-8") as f:
+        html_content = f.read()
+    return HTMLResponse(content=html_content, status_code=200)
 # ========================================
 # 1. Weight (体重管理)
 # ========================================
