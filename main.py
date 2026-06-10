@@ -28,8 +28,12 @@ def get_db():
 # ========================================
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
-    # ✨ 最新ルール！名前をハッキリ指定して渡すことで誤解を完全ブロック！
-    return templates.TemplateResponse(request=request, name="index.html")
+    # ✨ media_type="text/html" を追加して、強制的にWebページとして表示させます！
+    return templates.TemplateResponse(
+        request=request, 
+        name="index.html", 
+        media_type="text/html"
+    )
 # ========================================
 # 1. Weight (体重管理)
 # ========================================
