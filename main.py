@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -27,9 +28,12 @@ def get_db():
 # 🏠 案内係（スッキリ分離版！）
 # ========================================
 @app.get("/", response_class=HTMLResponse)
+@app.head("/")  # ✨ これでRenderからの「生きてる？」ノックに笑顔で応えられます！
 def read_root():
-    # 枠組みの自動判定に頼らず、index.htmlを直接読み込んで強制的にHTMLとして送り返します！
-    with open("templates/index.html", "r", encoding="utf-8") as f:
+    # ✨ どこから実行されても絶対にズレない「絶対パス」でファイルを読み込む最強の書き方！
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(BASE_DIR, "templates", "index.html")
+    with open(path, "r", encoding="utf-8") as f:
         html_content = f.read()
     return HTMLResponse(content=html_content, status_code=200)
 # ========================================
