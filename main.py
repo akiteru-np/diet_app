@@ -1,15 +1,21 @@
 import os
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import date as date_type
 from typing import Optional
+import jwt  # ✨追加：暗号解読ツール
 import models, schemas
 from database import engine, SessionLocal
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+security = HTTPBearer() # ✨追加：APIの入り口に立つ警備員
+
+# 環境変数からJWT Secretを取得（設定されていなければエラー防止のダミーを入れる）
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "dummy_secret")
 
 def get_db():
     db = SessionLocal()
@@ -18,15 +24,28 @@ def get_db():
     finally:
         db.close()
 
-# ✨ 仮のログイン認証（次のフェーズで本物のSupabase Authに差し替えます！）
-def get_current_user(db: Session = Depends(get_db)) -> str:
-    dummy_id = "test-user-001"
-    user = db.query(models.User).filter(models.User.id == dummy_id).first()
-    if not user:
-        user = models.User(id=dummy_id, email="test@example.com")
-        db.add(user)
-        db.commit()
-    return user.id
+# 👑 本物のログイン認証（Supabase JWTトークンの検証）
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> str:
+    token = credentials.credentials
+    try:
+        # Supabaseが発行した「身分証明書」が本物か、秘密の鍵でチェック！
+        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="無効なトークンです")
+            
+        # ユーザーがDBに存在するか確認（初めてのログインなら自動的にユーザー登録）
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            user = models.User(id=user_id, email=payload.get("email", ""))
+            db.add(user)
+            db.commit()
+            
+        return user_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="トークンの有効期限が切れています")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="無効なトークンです")
 
 # ── ルート ──────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
