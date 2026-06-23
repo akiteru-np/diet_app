@@ -105,7 +105,9 @@ def parse_gemini_response(res_json):
 @app.get("/api/ai/predict-ingredient")
 def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
     if not GEMINI_API_KEY: raise HTTPException(status_code=400, detail="GEMINI_API_KEYが設定されていません")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    # ✨ 修正：最も賢く安定している上位モデル「gemini-1.5-pro」に変更！
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     食材名「{name}」について、最も適合する単位（g, 個, ml）を選択し、農林水産省データを基準にPFCを予測してください。
@@ -128,9 +130,10 @@ class RecipeAIRequest(BaseModel):
 @app.post("/api/ai/analyze-recipe")
 def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_user)):
     if not GEMINI_API_KEY: raise HTTPException(status_code=400, detail="GEMINI_API_KEYが設定されていません")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
-    # ✨ 指摘反映：食材の表記ゆれ防止をプロンプトに厳格に追加
+    # ✨ 修正：こちらも「gemini-1.5-pro」に変更！
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+    
     prompt = """
     提供された情報からレシピを抽出し、以下のJSON形式のみで出力してください。
     1. title: レシピ名
@@ -154,7 +157,6 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"解析エラー: {str(e)}")
 
-# ✨ 指摘反映：他人のデータを勝手に消せないように user_id ロックを復活
 @app.delete("/weights/{weight_id}")
 def delete_weight(weight_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_weight = db.query(models.Weight).filter(models.Weight.id == weight_id, models.Weight.user_id == user_id).first()
@@ -179,7 +181,6 @@ def delete_meal(meal_id: int, db: Session = Depends(get_db), user_id: str = Depe
     if not db_meal: raise HTTPException(status_code=404, detail="権限がありません")
     db.delete(db_meal); db.commit(); return {"status": "success"}
 
-# その他データ作成系
 @app.post("/weights/", response_model=schemas.WeightResponse)
 def create_weight(weight_data: schemas.WeightCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     existing = db.query(models.Weight).filter(models.Weight.user_id == user_id, models.Weight.date == weight_data.date).first()
