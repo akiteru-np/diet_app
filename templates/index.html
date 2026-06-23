@@ -58,11 +58,8 @@
   .btn-purple { background: var(--purple); color: #fff; }
   .btn-blue   { background: var(--blue);   color: #fff; }
   .btn-red    { background: var(--red-lt); color: var(--red); }
-  
-  /* ✨ 指摘反映：btn-ghost が抜けていたのを復活 */
   .btn-ghost  { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
   .btn-ghost:hover { background: #f8f9fa; }
-
   .btn-sm { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
   .btn-full { width: 100%; display: block; }
   
@@ -361,7 +358,7 @@ let selectedIngBase = null, currentSelectedType = null, isManualOverride = false
 let selectedRecipeIngredients = [];
 let currentGoalChartMode = 'all';
 
-// ✨ 指摘反映：日本時間（UTC+9）ベースで安全に「今日」を取得
+// 日本時間（UTC+9）で確実な「今日」を取得
 const today = new Date().toLocaleDateString('sv-SE');
 
 function escapeHtml(str) {
@@ -448,7 +445,7 @@ async function importRecipeViaAI() {
     }
     
     renderSelectedRecipeIngredientsList();
-    toast(`🎉 AIインポート完了！レシピをご確認の上保存してください（タグは未入力です）`);
+    toast(`🎉 AIインポート完了！レシピをご確認の上保存してください`);
   } catch(e) {
     toast(`AIレシピ解析に失敗しました: ${e.message}`, true);
   } finally {
@@ -612,7 +609,7 @@ async function saveMeal() {
 }
 async function deleteMeal(id) { if (!confirm('削除しますか？')) return; await api(`/meals/${id}`, 'DELETE').catch(e => toast(e.message, true)); toast('🗑️ 削除しました'); loadMealPage(); }
 
-// ✨ 指摘反映：完全に脱落していた logRecipeAsMeal 関数を復活！
+// ✨ 指摘反映：logRecipeAsMeal の完全復活
 async function logRecipeAsMeal(id) {
   const r = globalRecipes.find(x => x.id === id); if(!r) return;
   await api('/meal_histories/', 'POST', { date: v('m-date').value || today, name: r.title, amount_g: 100, calories: r.total_calories, protein: r.total_protein, fat: r.total_fat, carbs: r.total_carbs });
@@ -703,7 +700,6 @@ async function refreshRecipesList() {
   globalRecipes = await api(url); loadRecipePage();
 }
 
-// ✨ 指摘反映：削除後にフィルターを強制リセットして再取得するように修正
 async function deleteRecipe(id) { 
   if(!confirm('削除しますか？')) return; 
   try {

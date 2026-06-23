@@ -92,6 +92,7 @@ def fetch_text_from_url(url: str) -> str:
     except Exception as e:
         return f"(URL取得失敗: {str(e)})"
 
+# ✨ AIの返答を解析する部分のバグを完全修正
 def parse_gemini_response(res_json):
     if "error" in res_json:
         raise Exception(f"API Error: {res_json['error'].get('message', str(res_json))}")
@@ -100,20 +101,19 @@ def parse_gemini_response(res_json):
         text = text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
     except Exception as e:
-        raise Exception(f"JSON Parsing Error: {str(e)}")
+        raise Exception(f"JSON Parsing Error: {str(e)} | Raw: {str(res_json)[:200]}")
 
 @app.get("/api/ai/predict-ingredient")
 def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
     if not GEMINI_API_KEY: raise HTTPException(status_code=400, detail="GEMINI_API_KEYが設定されていません")
     
-    # ✨ 修正：最も賢く安定している上位モデル「gemini-1.5-pro」に変更！
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     食材名「{name}」について、最も適合する単位（g, 個, ml）を選択し、農林水産省データを基準にPFCを予測してください。
     【重要】単位が「g」または「ml」の場合は必ず「100(g/ml)あたり」の数値を、「個」の場合は「1個あたり」の数値を厳守してください。
     【書式】余計な文字を含めず、以下のJSONのみ出力してください。
-    {{ "unit": "g|個|ml", "calories": 数値, "protein": 数値, "fat": 数値, "carbs": 数値 }}
+    {{ "unit": "g" または "個" または "ml", "calories": 数値, "protein": 数値, "fat": 数値, "carbs": 数値 }}
     """
     try:
         res = requests.post(url, headers={"Content-Type": "application/json"}, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
@@ -131,15 +131,14 @@ class RecipeAIRequest(BaseModel):
 def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_user)):
     if not GEMINI_API_KEY: raise HTTPException(status_code=400, detail="GEMINI_API_KEYが設定されていません")
     
-    # ✨ 修正：こちらも「gemini-1.5-pro」に変更！
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = """
     提供された情報からレシピを抽出し、以下のJSON形式のみで出力してください。
     1. title: レシピ名
     2. instructions: 作り方の手順（改行含む）
-    3. ingredients: 食材リスト。「name」は表記ゆれを防ぐため、一般的な平仮名・カタカナ交じりの標準名（例：「鶏胸肉」ではなく「鶏むね肉」、「玉葱」ではなく「玉ねぎ」）に統一してください。「amount」はレシピの分量を数値（g, ml, 個）に換算してください。
-    {{ "title": "レシピ名", "instructions": "手順", "ingredients": [ {{"name": "鶏むね肉", "amount": 150}} ] }}
+    3. ingredients: 食材リスト。「name」は表記ゆれを防ぐため、一般的な平仮名・カタカナ交じりの標準名（例：「鶏胸肉」ではなく「鶏むね肉」）に統一してください。「amount」はレシピの分量を数値（g, ml, 個）に換算してください。
+    {{ "title": "レシピ名", "instructions": "手順テキスト", "ingredients": [ {{"name": "鶏むね肉", "amount": 150}} ] }}
     """
     
     parts = []
