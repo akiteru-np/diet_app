@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Diet Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 <style>
@@ -22,11 +23,11 @@
          background: var(--bg); color: var(--text); font-size: 15px; }
 
   /* ── レイアウト ── */
-  .app { max-width: 700px; margin: 0 auto; padding: 16px; }
+  .app { max-width: 700px; margin: 0 auto; padding: 16px; display: none; } /* ログイン完了まで隠す */
   .nav { display: flex; gap: 4px; background: var(--card); border-radius: var(--radius);
          padding: 6px; box-shadow: var(--shadow); margin-bottom: 20px; overflow-x: auto; }
-  .nav-btn { flex: 1; min-width: 80px; padding: 8px 4px; border: none; background: none;
-             border-radius: 8px; font-size: 13px; cursor: pointer; color: var(--muted);
+  .nav-btn { flex: 1; min-width: 70px; padding: 8px 4px; border: none; background: none;
+             border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--muted);
              display: flex; flex-direction: column; align-items: center; gap: 3px;
              transition: background .15s, color .15s; white-space: nowrap; }
   .nav-btn .icon { font-size: 20px; }
@@ -36,70 +37,57 @@
   .page { display: none; }
   .page.active { display: block; }
 
-  /* ── カード ── */
-  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
-          padding: 20px; margin-bottom: 16px; }
-  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex;
-                align-items: center; gap: 8px; }
-
-  /* ── フォーム部品 ── */
+  /* ── 👑 ログイン画面 ── */
+  #auth-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  
+  /* ── 共通スタイル ── */
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px; width: 100%; }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
   .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
   .form-row > * { flex: 1; min-width: 100px; }
-  input, select, textarea {
-    width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
-    border-radius: 8px; font-size: 14px; color: var(--text);
-    background: #fff; transition: border-color .15s; outline: none; font-family: inherit; }
+  input, select, textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--text); background: #fff; outline: none; }
   input:focus, select:focus, textarea:focus { border-color: var(--green); }
   textarea { resize: vertical; min-height: 70px; }
-  label.field-label { font-size: 12px; font-weight: 600; color: var(--muted);
-                      display: block; margin-bottom: 4px; text-transform: uppercase; }
-
-  /* ── ボタン ── */
-  .btn { padding: 10px 18px; border: none; border-radius: 8px; font-size: 14px;
-         font-weight: 500; cursor: pointer; transition: opacity .15s, transform .1s;
-         display: inline-flex; align-items: center; gap: 6px; }
+  label.field-label { font-size: 12px; font-weight: 600; color: var(--muted); display: block; margin-bottom: 4px; text-transform: uppercase; }
+  .btn { padding: 10px 18px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: transform .1s; text-align: center; }
   .btn:active { transform: scale(.97); }
   .btn-green  { background: var(--green);  color: #fff; }
-  .btn-green:hover  { background: var(--green-dk); }
   .btn-orange { background: var(--orange); color: #fff; }
   .btn-purple { background: var(--purple); color: #fff; }
   .btn-blue   { background: var(--blue);   color: #fff; }
   .btn-red    { background: var(--red-lt); color: var(--red); }
-  .btn-red:hover    { background: var(--red); color: #fff; }
-  .btn-ghost  { background: #f4f5f7; color: var(--muted); }
+  .btn-ghost  { background: #f4f5f7; color: var(--text); }
   .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
-  .btn-full { width: 100%; justify-content: center; }
-
-  /* ── リスト ── */
+  .btn-full { width: 100%; display: block; }
+  
   .data-list { border: 1.5px solid var(--border); border-radius: 10px; max-height: 220px; overflow-y: auto; }
   .data-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
   .data-item:last-child { border-bottom: none; }
   .data-item .item-main { flex: 1; }
   .data-item .item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-  /* ── その他 ── */
+  
   .pfc-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   .pfc-pill { flex: 1; min-width: 70px; padding: 10px; border-radius: 10px; text-align: center; }
   .pfc-pill .pfc-val { font-size: 20px; font-weight: 600; }
   .pfc-pill .pfc-lbl { font-size: 11px; margin-top: 2px; }
-  .pfc-p { background: var(--blue-lt);   color: var(--blue); }
-  .pfc-f { background: var(--red-lt);    color: var(--red); }
+  .pfc-p { background: var(--blue-lt); color: var(--blue); }
+  .pfc-f { background: var(--red-lt); color: var(--red); }
   .pfc-c { background: var(--orange-lt); color: var(--orange); }
-  .pfc-k { background: var(--green-lt);  color: var(--green); }
+  .pfc-k { background: var(--green-lt); color: var(--green); }
+  
   .progress-wrap { margin-bottom: 10px; }
   .progress-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
   .progress-track { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
   .progress-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+  
   .recipe-card { border-left: 4px solid var(--purple); background: var(--purple-lt); border-radius: 0 10px 10px 0; padding: 14px; margin-bottom: 12px; }
   .recipe-card-title { font-weight: 600; font-size: 15px; color: var(--purple); margin-bottom: 6px; }
   .recipe-card-pfc { font-size: 12px; color: var(--blue); background: #eaf2f8; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
   .recipe-card-ings { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-  .recipe-card-actions { display: flex; gap: 8px; margin-top: 10px; }
-  .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-  .ing-row select { flex: 2; }
-  .ing-row input  { flex: 1; }
+  
   .proposal-card { border-left: 4px solid var(--orange); background: var(--orange-lt); border-radius: 0 10px 10px 0; padding: 14px; margin-bottom: 12px; }
   .proposal-title { font-weight: 600; font-size: 15px; color: var(--orange); margin-bottom: 6px; }
+  
   .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 14px; }
   .chart-wrap { position: relative; }
   .chart-wrap canvas { max-height: 260px; }
@@ -107,17 +95,41 @@
   #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #2c3e50; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: transform .3s, opacity .3s; z-index: 999; pointer-events: none; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
   .goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .ing-row select { flex: 2; }
+  .ing-row input  { flex: 1; }
 </style>
 </head>
 <body>
-<div class="app">
 
+<div id="auth-screen">
+  <div class="card" style="max-width: 400px; text-align: center;">
+    <div style="font-size: 40px; margin-bottom: 10px;">🥗</div>
+    <div class="card-title" style="justify-content: center; font-size: 20px;">Diet Tracker</div>
+    <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px;">あなた専用のPFC＆体重管理アプリ</p>
+    
+    <div class="form-row">
+      <div style="text-align: left;"><label class="field-label">メールアドレス</label><input type="email" id="auth-email" placeholder="email@example.com"></div>
+    </div>
+    <div class="form-row">
+      <div style="text-align: left;"><label class="field-label">パスワード (6文字以上)</label><input type="password" id="auth-password" placeholder="••••••••"></div>
+    </div>
+    
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button class="btn btn-green" style="flex: 1;" onclick="handleLogin()">ログイン</button>
+      <button class="btn btn-ghost" style="flex: 1;" onclick="handleSignup()">新規登録</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="main-app">
   <nav class="nav" role="navigation">
     <button class="nav-btn active" onclick="switchPage('weight')"><span class="icon">⚖️</span><span>体重</span></button>
     <button class="nav-btn" onclick="switchPage('meal')"><span class="icon">🍽️</span><span>食事</span></button>
     <button class="nav-btn" onclick="switchPage('recipe')"><span class="icon">📖</span><span>レシピ</span></button>
     <button class="nav-btn" onclick="switchPage('ingredient')"><span class="icon">🥗</span><span>食材</span></button>
     <button class="nav-btn" onclick="switchPage('goal')"><span class="icon">🎯</span><span>目標</span></button>
+    <button class="nav-btn" onclick="handleLogout()"><span class="icon">🚪</span><span>ログアウト</span></button>
   </nav>
 
   <section id="page-weight" class="page active">
@@ -137,14 +149,11 @@
     <div class="card">
       <div class="card-title">🍽️ 食事を記録する</div>
       <div class="form-row">
-        <div>
-          <label class="field-label">日付</label>
-          <input type="date" id="m-date" onchange="loadMealPage()">
-        </div>
+        <div><label class="field-label">日付</label><input type="date" id="m-date" onchange="loadMealPage()"></div>
         <div style="position: relative; flex: 2;">
-          <label class="field-label">食べたもの（食材・レシピを検索）</label>
+          <label class="field-label">食べたもの（検索）</label>
           <input type="text" id="m-name" placeholder="鶏むね肉、沼親子丼..." oninput="handleSearchInput()" autocomplete="off">
-          <ul id="search-suggestions" class="data-list" style="display: none; position: absolute; width: 100%; background: white; z-index: 10; margin-top: 4px; box-shadow: var(--shadow); max-height: 200px; overflow-y: auto;"></ul>
+          <ul id="search-suggestions" class="data-list" style="display: none; position: absolute; width: 100%; background: white; z-index: 10; margin-top: 4px; box-shadow: var(--shadow);"></ul>
         </div>
       </div>
 
@@ -155,18 +164,15 @@
 
       <div class="form-row">
         <div style="display: flex; gap: 8px; align-items: flex-end;">
-          <div style="flex: 1;">
-            <label class="field-label">量</label>
-            <input type="number" id="m-amount" value="100" min="1" placeholder="100" oninput="recalcMealPFC()">
-          </div>
-          <div style="padding-bottom: 10px; width: 25px; font-size: 14px; color: var(--muted); font-weight: bold;" id="mealUnitLabel">g</div>
+          <div style="flex: 1;"><label class="field-label">量</label><input type="number" id="m-amount" value="100" min="1" oninput="recalcMealPFC()"></div>
+          <div style="padding-bottom: 10px; width: 25px; font-size: 14px; font-weight: bold;" id="mealUnitLabel">g</div>
         </div>
-        <div><label class="field-label">kcal</label><input type="number" id="m-cal" placeholder="0" step="0.1"></div>
+        <div><label class="field-label">kcal</label><input type="number" id="m-cal" step="0.1"></div>
       </div>
       <div class="form-row">
-        <div><label class="field-label">P タンパク質 (g)</label><input type="number" id="m-p" placeholder="0" step="0.1"></div>
-        <div><label class="field-label">F 脂質 (g)</label><input type="number" id="m-f" placeholder="0" step="0.1"></div>
-        <div><label class="field-label">C 炭水化物 (g)</label><input type="number" id="m-c" placeholder="0" step="0.1"></div>
+        <div><label class="field-label">P (g)</label><input type="number" id="m-p" step="0.1"></div>
+        <div><label class="field-label">F (g)</label><input type="number" id="m-f" step="0.1"></div>
+        <div><label class="field-label">C (g)</label><input type="number" id="m-c" step="0.1"></div>
       </div>
       <button class="btn btn-orange btn-full" onclick="saveMeal()">📥 記録する</button>
     </div>
@@ -175,9 +181,9 @@
       <div class="card-title">📊 当日の合計 <span id="meal-date-label" style="font-size:13px;font-weight:400;color:var(--muted)"></span></div>
       <div class="pfc-bar">
         <div class="pfc-pill pfc-k"><div class="pfc-val" id="t-cal">—</div><div class="pfc-lbl">kcal</div></div>
-        <div class="pfc-pill pfc-p"><div class="pfc-val" id="t-p">—</div><div class="pfc-lbl">タンパク質 g</div></div>
-        <div class="pfc-pill pfc-f"><div class="pfc-val" id="t-f">—</div><div class="pfc-lbl">脂質 g</div></div>
-        <div class="pfc-pill pfc-c"><div class="pfc-val" id="t-c">—</div><div class="pfc-lbl">炭水化物 g</div></div>
+        <div class="pfc-pill pfc-p"><div class="pfc-val" id="t-p">—</div><div class="pfc-lbl">P</div></div>
+        <div class="pfc-pill pfc-f"><div class="pfc-val" id="t-f">—</div><div class="pfc-lbl">F</div></div>
+        <div class="pfc-pill pfc-c"><div class="pfc-val" id="t-c">—</div><div class="pfc-lbl">C</div></div>
       </div>
       <div id="goal-progress"></div>
       <div class="chart-wrap-sm"><canvas id="pfcChart"></canvas></div>
@@ -234,20 +240,19 @@
       <div id="proposal-list"><div class="empty">食材を選ぶとレシピを提案します</div></div>
     </div>
   </section>
-
 </div>
 
 <div id="toast"></div>
 
 <script>
-let globalIngredients = [];
-let globalRecipes = [];
-let globalGoal = null;
-let weightChart, pfcChart;
-let selectedIngBase = null; 
-let currentSelectedType = null; 
-let isManualOverride = false;
+// 🔒 安全設計：ここには何も貼り付けなくてOKです！自動でRenderから読み込みます
+let SUPABASE_URL = '';
+let SUPABASE_ANON_KEY = '';
+let _supabase = null;
+let sessionToken = null;
 
+let globalIngredients = [], globalRecipes = [], globalGoal = null;
+let weightChart, pfcChart, selectedIngBase = null, currentSelectedType = null, isManualOverride = false;
 const today = new Date().toISOString().split('T')[0];
 
 function toast(msg, isError = false) {
@@ -255,16 +260,58 @@ function toast(msg, isError = false) {
   el.textContent = msg; el.style.background = isError ? '#c0392b' : '#2c3e50';
   el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2800);
 }
+
+// ✨ 通信時にトークン（証明書）を提示する魔法
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (sessionToken) Object.assign(opts.headers, { 'Authorization': `Bearer ${sessionToken}` });
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.status === 204 ? null : res.json();
 }
+
 function v(id) { return document.getElementById(id); }
 function fv(id) { return parseFloat(v(id).value) || 0; }
 function sv(id) { return v(id).value.trim(); }
+
+// 👑 Auth ロジック
+async function checkSession() {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (session) {
+    sessionToken = session.access_token;
+    v('auth-screen').style.display = 'none';
+    v('main-app').style.display = 'block';
+    initializeApp();
+  } else {
+    v('auth-screen').style.display = 'flex';
+    v('main-app').style.display = 'none';
+  }
+}
+
+async function handleLogin() {
+  const email = sv('auth-email'), password = sv('auth-password');
+  if(!email || !password) return toast('入力してください', true);
+  const { error } = await _supabase.auth.signInWithPassword({ email, password });
+  if(error) return toast('ログイン失敗: ' + error.message, true);
+  toast('ログインしました！');
+  checkSession();
+}
+
+async function handleSignup() {
+  const email = sv('auth-email'), password = sv('auth-password');
+  if(!email || !password) return toast('入力してください', true);
+  const { error } = await _supabase.auth.signUp({ email, password });
+  if(error) return toast('登録失敗: ' + error.message, true);
+  toast('✅ 登録成功！ログインしました');
+  checkSession();
+}
+
+async function handleLogout() {
+  await _supabase.auth.signOut();
+  sessionToken = null;
+  location.reload();
+}
 
 function progressBar(label, val, max, color) {
   if (!max) return '';
@@ -297,17 +344,14 @@ async function loadWeightPage() {
 async function saveWeight() { const d = sv('w-date'), kg = sv('w-kg'); if (!d || !kg) return toast('入力が足りません', true); await api('/weights/', 'POST', { date: d, weight: parseFloat(kg) }); toast('✅ 記録しました'); loadWeightPage(); }
 async function deleteWeight(id) { if (!confirm('削除しますか？')) return; await api(`/weights/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadWeightPage(); }
 
-// 💡 検索とスマート計算ロジック
 async function loadMealPage() {
   if (!v('m-date').value) v('m-date').value = today;
   const d = v('m-date').value; v('meal-date-label').textContent = d;
   const meals = await api(`/meal_histories/?date=${d}`);
   v('meal-list').innerHTML = meals.length ? meals.map(m => `<div class="data-item"><div class="item-main"><strong>${m.name}</strong> ${m.amount_g}${m.amount_g % 1 === 0 ? 'g' : ''}<div class="item-sub">${m.calories.toFixed(0)}kcal ／ P${m.protein.toFixed(1)} F${m.fat.toFixed(1)} C${m.carbs.toFixed(1)}</div></div><button class="btn btn-red btn-sm" onclick="deleteMeal(${m.id})">削除</button></div>`).join('') : '<div class="empty">記録はありません</div>';
-  
   const cal = meals.reduce((s, m) => s + (m.calories||0), 0), p = meals.reduce((s, m) => s + (m.protein||0), 0), f = meals.reduce((s, m) => s + (m.fat||0), 0), c = meals.reduce((s, m) => s + (m.carbs||0), 0);
   v('t-cal').textContent = cal.toFixed(0); v('t-p').textContent = p.toFixed(1); v('t-f').textContent = f.toFixed(1); v('t-c').textContent = c.toFixed(1);
   v('goal-progress').innerHTML = globalGoal ? progressBar('kcal', cal, globalGoal.calories, '#27ae60') + progressBar('タンパク質', p, globalGoal.protein, '#2980b9') + progressBar('脂質', f, globalGoal.fat, '#e74c3c') + progressBar('炭水化物', c, globalGoal.carbs, '#e67e22') : '';
-  
   const ctx = v('pfcChart').getContext('2d');
   if (pfcChart) pfcChart.destroy();
   pfcChart = new Chart(ctx, { type: 'doughnut', data: { labels: [`P: ${p.toFixed(1)}g`, `F: ${f.toFixed(1)}g`, `C: ${c.toFixed(1)}g`], datasets: [{ data: [p,f,c], backgroundColor: ['#2980b9','#e74c3c','#e67e22'] }] }, options: { plugins: { legend: { position: 'bottom' } } } });
@@ -429,12 +473,36 @@ async function refreshIngredients() {
   document.querySelectorAll('.r-ing-id').forEach(sel => { const cur = sel.value; sel.innerHTML = globalIngredients.map(i => `<option value="${i.id}"${i.id==cur?' selected':''}>${i.name} (${i.unit})</option>`).join(''); });
 }
 
-window.addEventListener('DOMContentLoaded', async () => {
+async function initializeApp() {
   v('w-date').value = today; v('m-date').value = today;
   globalGoal = await api('/goals/').catch(() => null);
   globalRecipes = await api('/recipes/').catch(() => []);
   await refreshIngredients();
   loadWeightPage(); addIngRow();
+}
+
+// ✨ タイポ修正：「食力」を「食事」へ置換
+document.addEventListener('DOMContentLoaded', () => {
+  const cardTitle = document.querySelector('#page-meal .card-title');
+  if (cardTitle && cardTitle.textContent.includes('食力')) {
+    cardTitle.innerHTML = '🍽️ 食事を記録する';
+  }
+});
+
+// ✨ 起動時にバックエンドから環境変数を安全に取得して初期化
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const config = await api('/auth/config');
+    SUPABASE_URL = config.supabase_url;
+    SUPABASE_ANON_KEY = config.supabase_anon_key;
+    
+    const { createClient } = supabase;
+    _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    checkSession();
+  } catch (e) {
+    toast("認証情報の取得に失敗しました", true);
+  }
 });
 </script>
 </body>

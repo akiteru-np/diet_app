@@ -47,6 +47,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="無効なトークンです")
 
+# フロントエンドにRenderの環境変数から安全なキーだけを貸し出す
+@app.get("/auth/config")
+def get_auth_config():
+    return {
+        "supabase_url": os.environ.get("SUPABASE_URL", ""),
+        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", "")
+    }
+
 # ── ルート ──────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 @app.head("/")
