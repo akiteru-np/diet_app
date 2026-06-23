@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import re  # ✨ URLの中身からHTMLタグを取り除くための魔法
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,7 +34,6 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
 jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL)
 
-# 🤖 Version 2.0: Gemini API Key の取得
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 def get_db():
@@ -79,7 +79,6 @@ def read_tags(db: Session = Depends(get_db), user_id: str = Depends(get_current_
     tags = db.query(models.Tag).all()
     return [t.name for t in tags]
 
-# 🤖 Version 2.0: ① 食材の単位・PFCのAI自動予測API
 @app.get("/api/ai/predict-ingredient")
 def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
     if not GEMINI_API_KEY:
@@ -96,7 +95,7 @@ def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
     - 個数や玉数で使われることが多い場合（例：卵、ピーマン、玉ねぎ、じゃがいも、アボカドなど）は「個」
     - グラム単位で使われることが多い場合（例：お米、豚肉、牛肉、鶏肉、鮭、マグロなど）は「g」
 
-    必ず以下の正確なJSONオブジェクトのみを返答してください。前後の説明文や、マークダウン（```json のような囲み）は一切含めないでください。
+    必ず以下の正確なJSONオブジェクトのみを返答してください。前後の説明文やマークダウンは一切含めないでください。
     {{
         "unit": "g" または "個" または "ml",
         "calories": カロリー（数値）,
@@ -115,13 +114,28 @@ def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
         res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=12)
         if res.status_code != 200:
             raise HTTPException(status_code=500, detail="Gemini APIとの通信に失敗しました")
-        
         text_res = res.json()['contents'][0]['parts'][0]['text']
         return json.loads(text_res)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI予測エラー: {str(e)}")
 
-# 🤖 Version 2.0: ② レシピ（テキスト・URL・画像）のAI一括解析リクエスト構造
+# ✨ 新機能：URLのサイトから文章を強引にぶっこ抜く関数
+def fetch_text_from_url(url: str) -> str:
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        res = requests.get(url, headers=headers, timeout=10)
+        res.raise_for_status()
+        html = res.text
+        # スクリプトとスタイルを削除
+        html = re.sub(r'<script.*?>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+        html = re.sub(r'<style.*?>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
+        # HTMLタグを削除してテキストだけ抽出
+        text = re.sub(r'<[^>]+>', ' ', html)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text[:15000] # Geminiが読めるように先頭15000文字に制限
+    except Exception as e:
+        return f"(URL先のテキスト取得に失敗しました: {str(e)})"
+
 class RecipeAIRequest(BaseModel):
     text: Optional[str] = None
     url: Optional[str] = None
@@ -135,12 +149,12 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = """
-    提供された情報（料理の画像、レシピテキスト、サイトURL、または料理研究家リュウジのバズレシピ情報など）を徹底的に解析し、以下のJSONフォーマットに従ってレシピ情報を抽出してください。
+    提供された情報（料理の画像、レシピテキスト、サイトURLから抽出した内容など）を徹底的に解析し、以下のJSONフォーマットに従ってレシピ情報を抽出してください。
     
     【抽出・変換ルール】
     1. title: レシピの名前（料理名）を決定してください。
     2. instructions: 作り方の手順やメモを、ユーザーがそのままコピペして読めるよう綺麗にフォーマットしたテキスト（改行含む）にしてください。
-    3. ingredients: レシピに含まれる食材とそれぞれの量を抽出してください。「name」には一般的な食材名（例：豚バラ肉、キャベツなど）を指定し、「amount」にはレシピで指定されている量を適切な数値（gやml換算の推測値、または個数）で入れてください。
+    3. ingredients: レシピに含まれる食材とそれぞれの量を抽出してください。「name」には一般的な食材名（例：豚バラ肉、キャベツなど）を指定し、「amount」にはレシピで指定されている量を適切な数値（gやml換算の推測値、または個数）で入れてください。少々（塩など）は適当なg数に換算してください。
     
     必ず以下の正確なJSONオブジェクトのみを返答してください。余計な解説やマークダウンの装飾は一切含めないでください。
     {{
@@ -154,8 +168,11 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
     """
     
     parts = []
-    if req.text: parts.append({"text": f"【解析対象のテキストまたは情報】\n{req.text}"})
-    if req.url: parts.append({"text": f"【参照URL】\n{req.url}"})
+    if req.text: parts.append({"text": f"【解析対象のテキスト】\n{req.text}"})
+    if req.url:
+        # ✨ AIに代わってPythonがサイトの文章を取得し、AIに渡す！
+        scraped_text = fetch_text_from_url(req.url)
+        parts.append({"text": f"【参照URL（{req.url}）から抽出したウェブページの内容】\n{scraped_text}"})
     if req.image_base64:
         b64 = req.image_base64.split(",")[1] if "," in req.image_base64 else req.image_base64
         parts.append({"inlineData": {"mimeType": "image/jpeg", "data": b64}})
@@ -167,15 +184,16 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
     }
     
     try:
-        res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=20)
+        res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=25)
         if res.status_code != 200:
-            raise HTTPException(status_code=500, detail="Gemini APIによる解析に失敗しました")
+            # ✨ エラーの原因が特定できるように、APIからの直接の文言をブラウザに返す
+            raise HTTPException(status_code=500, detail=f"Gemini APIエラー: {res.text}")
         text_res = res.json()['contents'][0]['parts'][0]['text']
         return json.loads(text_res)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AIレシピ解析エラー: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"{str(e)}")
 
-# ── 以下、従来のデータベース同期ロジック ──
+# ── 以下、データベース同期ロジック（変更なし） ──
 @app.post("/weights/", response_model=schemas.WeightResponse)
 def create_weight(weight_data: schemas.WeightCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     existing = db.query(models.Weight).filter(models.Weight.user_id == user_id, models.Weight.date == weight_data.date).first()
