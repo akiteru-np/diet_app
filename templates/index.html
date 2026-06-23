@@ -83,7 +83,7 @@
   .recipe-card-title { font-weight: 600; font-size: 15px; color: var(--text); margin-bottom: 6px; }
   .recipe-card-pfc { font-size: 12px; color: var(--purple); background: var(--purple-lt); padding: 4px 10px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
   .recipe-card-ings { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .recipe-card-notes { font-size: 13px; color: #555; background: #f9f9f9; padding: 8px; border-radius: 6px; margin-bottom: 8px; white-space: pre-wrap; border-left: 2px solid #ddd; }
+  .recipe-card-notes { font-size: 13px; color: #555; background: #f9f9f9; padding: 8px; border-radius: 6px; margin-bottom: 8px; white-space: pre-wrap; border-left: 2px solid #ddd; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   
   .tag-badge { display: inline-block; background: #e8ecef; color: #495057; font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-right: 4px; margin-bottom: 4px; }
   
@@ -94,10 +94,14 @@
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
   .goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+  
+  /* 📖 モーダルのふわっと広がるアニメーション用 */
+  @keyframes modalOpen { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 </style>
 </head>
 <body>
 
+<!-- 👑 ログイン画面 -->
 <div id="auth-screen">
   <div class="card" style="max-width: 400px; text-align: center;">
     <div style="font-size: 40px; margin-bottom: 10px;">🥗</div>
@@ -112,6 +116,7 @@
   </div>
 </div>
 
+<!-- 👑 メインアプリ画面 -->
 <div class="app" id="main-app">
   <nav class="nav" role="navigation">
     <button class="nav-btn active" onclick="switchPage('weight')"><span class="icon">⚖️</span><span>体重</span></button>
@@ -122,6 +127,7 @@
     <button class="nav-btn" onclick="handleLogout()"><span class="icon">🚪</span><span>ログアウト</span></button>
   </nav>
 
+  <!-- ══ PAGE: 体重 ══ -->
   <section id="page-weight" class="page active">
     <div class="card">
       <div class="card-title">⚖️ 体重を記録する</div>
@@ -132,9 +138,11 @@
       <button class="btn btn-green btn-full" onclick="saveWeight()">📥 記録する</button>
     </div>
     <div class="card"><div class="card-title">📈 体重グラフ</div><div class="chart-wrap"><canvas id="weightChart"></canvas></div></div>
+    <!-- ✨ 要望反映①：履歴に削除ボタンを完備 -->
     <div class="card"><div class="card-title">🗂️ 履歴一覧</div><div id="weight-list" class="data-list"></div></div>
   </section>
 
+  <!-- ══ PAGE: 食事 ══ -->
   <section id="page-text-meal" class="page">
     <div class="card">
       <div class="card-title">🍽️ 食事を記録する</div>
@@ -152,14 +160,17 @@
         <div id="recipe-adjust-list"></div>
       </div>
 
-      <div class="form-row">
+      <!-- ✨ 要望反映②：混乱の元となる「量」の入力フォームエリアは非表示に隠蔽（裏計算のみ生かす） -->
+      <div class="form-row" style="display: none;">
         <div style="display: flex; gap: 8px; align-items: flex-end;">
           <div style="flex: 1;"><label class="field-label">量</label><input type="number" id="m-amount" value="100" min="1" oninput="recalcMealPFC()"></div>
-          <div style="padding-bottom: 10px; width: 35px; font-size: 14px; font-weight: bold;" id="mealUnitLabel">g</div>
+          <div style="padding-bottom: 10px; width: 25px; font-size: 14px; font-weight: bold;" id="mealUnitLabel">g</div>
         </div>
         <div><label class="field-label">kcal</label><input type="number" id="m-cal" step="0.1"></div>
       </div>
+      
       <div class="form-row">
+        <div><label class="field-label">kcal カロリー</label><input type="number" id="m-cal-visible" step="0.1" oninput="syncVisibleCalToHidden()"></div>
         <div><label class="field-label">P タンパク質 (g)</label><input type="number" id="m-p" step="0.1"></div>
         <div><label class="field-label">F 脂質 (g)</label><input type="number" id="m-f" step="0.1"></div>
         <div><label class="field-label">C 炭水化物 (g)</label><input type="number" id="m-c" step="0.1"></div>
@@ -167,8 +178,9 @@
       <button class="btn btn-orange btn-full" onclick="saveMeal()">📥 記録する</button>
     </div>
 
+    <!-- ✨ 要望反映④：文言を「今日の合計」に変更 -->
     <div class="card">
-      <div class="card-title">📊 当日の合計 <span id="meal-date-label" style="font-size:13px;font-weight:400;color:var(--muted)"></span></div>
+      <div class="card-title">📊 今日の合計 <span id="meal-date-label" style="font-size:13px;font-weight:400;color:var(--muted)"></span></div>
       <div class="pfc-bar">
         <div class="pfc-pill pfc-k"><div class="pfc-val" id="t-cal">—</div><div class="pfc-lbl">kcal</div></div>
         <div class="pfc-pill pfc-p"><div class="pfc-val" id="t-p">—</div><div class="pfc-lbl">タンパク質</div></div>
@@ -178,14 +190,24 @@
       <div id="goal-progress"></div>
       <div class="chart-wrap-sm"><canvas id="pfcChart"></canvas></div>
     </div>
-    <div class="card"><div class="card-title">🗂️ 当日の食事履歴</div><div id="meal-list" class="data-list"></div></div>
+    <!-- ✨ 要望反映④：文言を「今日の食事」に変更 -->
+    <div class="card"><div class="card-title">🗂️ 今日の食事</div><div id="meal-list" class="data-list"></div></div>
   </section>
 
+  <!-- ══ PAGE: レシピ ══ -->
   <section id="page-recipe" class="page">
     <div class="card">
       <div class="card-title">✏️ 新しいレシピを作成 (共有設定)</div>
       <div class="form-row"><div><label class="field-label">レシピ名</label><input type="text" id="r-title" placeholder="例: 鶏むね肉の塩麹焼き"></div></div>
-      <div class="form-row"><div><label class="field-label">タグ付け (カンマ区切りで複数可能)</label><input type="text" id="r-tags" placeholder="例: ダイエット, 高タンパク, 時短"></div></div>
+      
+      <!-- ✨ 要望反映③：タグ付け項目にGoogle検索風のサジェスト検索をフル装備 -->
+      <div class="form-row" style="position: relative;">
+        <div>
+          <label class="field-label">タグ付け (カンマ区切りで複数可能。クリックで全候補表示)</label>
+          <input type="text" id="r-tags" placeholder="例: ダイエット, 高タンパク" onfocus="handleTagFocus()" oninput="handleTagInput()" autocomplete="off">
+          <ul id="tag-suggestions" class="data-list" style="display: none; position: absolute; width: 100%; background: white; z-index: 30; margin-top: 4px; box-shadow: var(--shadow);"></ul>
+        </div>
+      </div>
       
       <div class="form-row" style="position: relative;">
         <div>
@@ -199,14 +221,14 @@
       <div id="r-ing-container" style="margin-bottom: 15px;"></div>
       
       <label class="field-label">作り方・メモ</label>
-      <textarea id="r-instructions" placeholder="手順や調理 of コツを記載してください..."></textarea>
+      <textarea id="r-instructions" placeholder="手順や調理のコツを記載してください..."></textarea>
       <div style="margin-top:12px"><button class="btn btn-purple btn-full" onclick="saveRecipe()">💾 保存する（PFC自動計算）</button></div>
     </div>
 
     <div class="card" style="border: 2px solid var(--purple)">
       <div class="card-title">🔍 超高度なレシピ検索</div>
       <div class="form-row">
-        <div><label class="field-label">キーワード検索</label><input type="text" id="search-r-title" placeholder="レシピ名..."></div>
+        <div><label class="field-label">レシピ名検索</label><input type="text" id="search-r-title" placeholder="レシピ名..."></div>
         <div><label class="field-label">含む食材</label><select id="search-r-ing"><option value="">— 食材指定なし —</option></select></div>
         <div><label class="field-label">タグ</label><input type="text" id="search-r-tag" placeholder="ダイエット など..."></div>
       </div>
@@ -221,6 +243,7 @@
     <div class="card"><div class="card-title">📔 共有レシピ一覧</div><div id="recipe-list"></div></div>
   </section>
 
+  <!-- ══ PAGE: 食材マスター ══ -->
   <section id="page-ingredient" class="page">
     <div class="card">
       <div class="card-title">➕ 新しい食材を登録する (共有設定)</div>
@@ -245,6 +268,7 @@
     <div class="card"><div class="card-title">🥗 共有食材マスター一覧</div><div id="ingredient-list" class="data-list"></div></div>
   </section>
 
+  <!-- ══ PAGE: 目標比較 ══ -->
   <section id="page-goal" class="page">
     <div class="card">
       <div class="card-title">🎯 1日の目標値を設定する</div>
@@ -274,18 +298,25 @@
   </section>
 </div>
 
+<!-- ✨ 要望反映⑤：大迫力で見やすさMAXなレシピ詳細拡大モーダルウィンドウ -->
+<div id="recipe-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; padding: 20px;" onclick="if(event.target==this)closeRecipeModal()">
+  <div class="card" style="max-width: 600px; max-height: 90vh; overflow-y: auto; margin: 0 auto; position: relative; animation: modalOpen 0.2s ease-out; border-top: 6px solid var(--purple);">
+    <button class="btn btn-ghost btn-sm" style="position: absolute; top: 15px; right: 15px; font-size: 14px; font-weight: bold; border-radius:20px;" onclick="closeRecipeModal()">✕ 閉じる</button>
+    <div id="modal-recipe-content" style="margin-top:15px;"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 let SUPABASE_URL = '', SUPABASE_ANON_KEY = '', _supabase = null, currentUserId = null;
-let globalIngredients = [], globalRecipes = [], globalGoal = null;
+let globalIngredients = [], globalRecipes = [], globalGoal = null, globalTags = [];
 let weightChart, pfcChart, comparisonChart;
 let selectedIngBase = null, currentSelectedType = null, isManualOverride = false;
-let selectedRecipeIngredients = []; // ✨ レシピ用に現在選択中の食材配列
+let selectedRecipeIngredients = [];
 let currentGoalChartMode = 'all';
 const today = new Date().toISOString().split('T')[0];
 
-// 🛡️ 指摘反映①：XSS対策用の HTMLエスケープ処理の徹底
 function escapeHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -357,11 +388,20 @@ async function handleLogout() { await _supabase.auth.signOut(); location.reload(
 
 async function loadWeightPage() {
   const data = await api('/weights/'); const sorted = [...data].sort((a,b) => a.date > b.date ? 1 : -1);
-  v('weight-list').innerHTML = sorted.length ? [...sorted].reverse().map(item => `<div class="data-item"><div class="item-main">📅 <strong>${escapeHtml(item.date)}</strong> &nbsp; ${item.weight} kg</div></div>`).join('') : '<div class="empty">まだ記録がありません</div>';
+  // ✨ 要望反映①：体重履歴に「削除」ボタンを追加
+  v('weight-list').innerHTML = sorted.length ? [...sorted].reverse().map(item => `
+    <div class="data-item">
+      <div class="item-main">📅 <strong>${escapeHtml(item.date)}</strong> &nbsp; ${item.weight} kg</div>
+      <button class="btn btn-red btn-sm" onclick="deleteWeight(${item.id})">削除</button>
+    </div>`).join('') : '<div class="empty">まだ記録がありません</div>';
   const ctx = v('weightChart').getContext('2d'); if (weightChart) weightChart.destroy();
   weightChart = new Chart(ctx, { type: 'line', data: { labels: sorted.map(d => d.date), datasets: [{ label: '体重 (kg)', data: sorted.map(d => d.weight), borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,.15)', borderWidth: 2, tension: 0.3 }] }, options: { scales: { x: { type: 'time', time: { unit: 'day' } } }, plugins: { legend: { display: false } } } });
 }
 async function saveWeight() { const d = sv('w-date'), kg = sv('w-kg'); if (!d || !kg) return toast('入力が足りません', true); await api('/weights/', 'POST', { date: d, weight: parseFloat(kg) }); toast('✅ 記録しました'); loadWeightPage(); }
+// ✨ 体重消去ロジック
+async function deleteWeight(id) { if(!confirm('この体重記録を削除しますか？')) return; await api(`/weights/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadWeightPage(); }
+
+function syncVisibleCalToHidden() { v('m-cal').value = v('m-cal-visible').value; }
 
 async function loadMealPage() {
   if (!v('m-date').value) v('m-date').value = today;
@@ -416,7 +456,7 @@ function selectRecipe(rec) {
 function recalcMealPFC() {
   if (isManualOverride || currentSelectedType !== 'ingredient' || !selectedIngBase) return;
   const factor = (selectedIngBase.unit === 'g' || selectedIngBase.unit === 'ml') ? fv('m-amount') / 100 : fv('m-amount');
-  v('m-cal').value = (selectedIngBase.calories * factor).toFixed(1); v('m-p').value = (selectedIngBase.protein * factor).toFixed(1); v('m-f').value = (selectedIngBase.fat * factor).toFixed(1); v('m-c').value = (selectedIngBase.carbs * factor).toFixed(1);
+  v('m-cal-visible').value = v('m-cal').value = (selectedIngBase.calories * factor).toFixed(1); v('m-p').value = (selectedIngBase.protein * factor).toFixed(1); v('m-f').value = (selectedIngBase.fat * factor).toFixed(1); v('m-c').value = (selectedIngBase.carbs * factor).toFixed(1);
 }
 
 function recalcAdjustedRecipe() {
@@ -427,19 +467,20 @@ function recalcAdjustedRecipe() {
       const factor = (ing.unit === 'g' || ing.unit === 'ml') ? amt/100 : amt;
       tCal += ing.calories*factor; tP += ing.protein*factor; tF += ing.fat*factor; tC += ing.carbs*factor; tAmt += amt;
   });
-  v('m-amount').value = tAmt; v('m-cal').value = tCal.toFixed(1); v('m-p').value = tP.toFixed(1); v('m-f').value = tF.toFixed(1); v('m-c').value = tC.toFixed(1);
+  v('m-amount').value = tAmt; v('m-cal-visible').value = v('m-cal').value = tCal.toFixed(1); v('m-p').value = tP.toFixed(1); v('m-f').value = tF.toFixed(1); v('m-c').value = tC.toFixed(1);
 }
 
-['m-cal', 'm-p', 'm-f', 'm-c'].forEach(id => v(id).addEventListener('input', () => isManualOverride = true));
+['m-cal-visible', 'm-p', 'm-f', 'm-c'].forEach(id => v(id).addEventListener('input', () => isManualOverride = true));
 document.addEventListener('click', e => { 
   if (!e.target.closest('#m-name') && !e.target.closest('#search-suggestions')) v('search-suggestions').style.display = 'none'; 
   if (!e.target.closest('#r-ing-search') && !e.target.closest('#recipe-ing-suggestions')) v('recipe-ing-suggestions').style.display = 'none'; 
+  if (!e.target.closest('#r-tags') && !e.target.closest('#tag-suggestions')) v('tag-suggestions').style.display = 'none'; 
 });
 
 async function saveMeal() {
   if (!sv('m-name')) return toast('食べたものを入力してください', true);
   await api('/meal_histories/', 'POST', { date: sv('m-date')||today, name: sv('m-name'), amount_g: fv('m-amount')||1, calories: fv('m-cal'), protein: fv('m-p'), fat: fv('m-f'), carbs: fv('m-c') });
-  toast('✅ 記録しました'); ['m-name','m-cal','m-p','m-f','m-c'].forEach(id => v(id).value = ''); v('m-amount').value = '100';
+  toast('✅ 記録しました'); ['m-name','m-cal','m-cal-visible','m-p','m-f','m-c'].forEach(id => v(id).value = ''); v('m-amount').value = '100';
   v('recipe-adjust-area').style.display = 'none'; currentSelectedType = null; loadMealPage();
 }
 async function deleteMeal(id) { if (!confirm('削除しますか？')) return; await api(`/meals/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadMealPage(); }
@@ -449,7 +490,6 @@ async function logRecipeAsMeal(id) {
   toast(`✅ 「${r.title}」の食事記録を追加しました`); loadMealPage();
 }
 
-// ✨ 要望反映②：レシピ作成画面での食材検索サジェストロジック
 function handleRecipeIngSearchInput() {
   const q = sv('r-ing-search').toLowerCase(), box = v('recipe-ing-suggestions'); if (!q) { box.style.display = 'none'; return; }
   box.innerHTML = '';
@@ -464,8 +504,7 @@ function handleRecipeIngSearchInput() {
 function addIngredientToRecipeArray(ing) {
   v('r-ing-search').value = ''; v('recipe-ing-suggestions').style.display = 'none';
   if (selectedRecipeIngredients.some(x => x.id === ing.id)) return toast('この食材はすでに追加されています', true);
-  selectedRecipeIngredients.push(ing);
-  renderSelectedRecipeIngredientsList();
+  selectedRecipeIngredients.push(ing); renderSelectedRecipeIngredientsList();
 }
 
 function renderSelectedRecipeIngredientsList() {
@@ -485,11 +524,38 @@ function removeIngredientFromRecipeArray(id) {
   renderSelectedRecipeIngredientsList();
 }
 
+// ✨ 要望反映③：Google風タグサジェストエンジン
+function handleTagFocus() { renderTagSuggestions(); }
+function handleTagInput() { renderTagSuggestions(); }
+
+function renderTagSuggestions() {
+  const input = v('r-tags'), box = v('tag-suggestions'), val = input.value;
+  const parts = val.split(',');
+  const lastPart = parts[parts.length - 1].trim().toLowerCase();
+  
+  box.innerHTML = '';
+  // 文字が入っていれば絞り込み、空なら全タグ一覧（よく使われている候補）を表示
+  const filtered = globalTags.filter(t => t.toLowerCase().includes(lastPart));
+  
+  if (!filtered.length) { box.style.display = 'none'; return; }
+  
+  filtered.forEach(tagName => {
+    const li = document.createElement('li'); li.className = 'data-item'; li.style.cursor = 'pointer';
+    li.innerHTML = `#🏷️ <span style="flex:1; margin-left:8px; font-weight:500;">${escapeHtml(tagName)}</span>`;
+    li.onclick = () => {
+      parts[parts.length - 1] = ` ${tagName}`;
+      input.value = parts.join(',').trim() + ', ';
+      box.style.display = 'none'; input.focus();
+    };
+    box.appendChild(li);
+  });
+  box.style.display = 'block';
+}
+
 async function saveRecipe() {
   if (!sv('r-title')) return toast('レシピ名を入力してください', true);
   const ingredients = Array.from(document.querySelectorAll('#r-ing-container .ing-row')).map(row => ({
-    ingredient_id: parseInt(row.getAttribute('data-id')),
-    amount: parseFloat(row.querySelector('.r-ing-amt').value)
+    ingredient_id: parseInt(row.getAttribute('data-id')), amount: parseFloat(row.querySelector('.r-ing-amt').value)
   })).filter(x => x.ingredient_id && x.amount);
   
   if (!ingredients.length) return toast('食材を最低1つは検索して追加してください', true);
@@ -498,7 +564,7 @@ async function saveRecipe() {
   await api('/recipes/', 'POST', { title: sv('r-title'), instructions: sv('r-instructions'), ingredients, tags: rawTags });
   toast('✅ レシピを全体公開で共有しました！'); v('r-title').value = ''; v('r-instructions').value = ''; v('r-tags').value = '';
   selectedRecipeIngredients = []; renderSelectedRecipeIngredientsList();
-  await refreshRecipesList();
+  await refreshRecipesList(); await refreshTags();
 }
 
 async function refreshRecipesList() {
@@ -522,15 +588,39 @@ async function loadRecipePage() {
       <div class="recipe-card-title">🍳 ${escapeHtml(r.title)}</div>
       <div style="margin-bottom:6px;">${tagHtml}</div>
       <div class="recipe-card-pfc">🔥 ${r.total_calories.toFixed(0)} kcal ／ P: ${r.total_protein.toFixed(1)}g ／ F: ${r.total_fat.toFixed(1)}g ／ C: ${r.total_carbs.toFixed(1)}g</div>
-      <div class="recipe-card-ings">📦 【材料】${r.ingredients.map(ri => `${escapeHtml(ri.ingredient.name)}: ${ri.amount}${escapeHtml(ri.ingredient.unit)}`).join('、') || '食材なし'}</div>
-      <div class="recipe-card-notes">📝 ${r.instructions ? escapeHtml(r.instructions) : '手順の記載はありません。'}</div>
-      <div class="recipe-card-actions">
+      <div class="recipe-card-ings" style="margin-bottom:10px;">📦 【材料】${r.ingredients.map(ri => `${escapeHtml(ri.ingredient.name)}: ${ri.amount}${escapeHtml(ri.ingredient.unit)}`).join('、') || '食材なし'}</div>
+      <div class="recipe-card-notes" style="margin-bottom:12px;">📝 ${r.instructions ? escapeHtml(r.instructions) : '手順の記載はありません。'}</div>
+      <div class="recipe-card-actions" style="display:flex; gap:6px;">
         <button class="btn btn-orange btn-sm" onclick="logRecipeAsMeal(${r.id})">🍽️ 今日食べた</button>
-        <button class="btn btn-red btn-sm" onclick="deleteRecipe(${r.id})">🗑️ ゴミ消去</button>
+        <!-- ✨ 要望反映⑤：モーダル拡大表示トリガーボタン -->
+        <button class="btn btn-purple btn-sm" onclick="openRecipeModal(${r.id})">📖 材料・手順を拡大表示</button>
+        <button class="btn btn-red btn-sm" onclick="deleteRecipe(${r.id})">🗑️ 消去</button>
       </div>
     </div>`
   }).join('') : '<div class="empty">該当するレシピが見つかりません</div>';
 }
+
+// ✨ レシピモーダル拡大描画ロジック
+function openRecipeModal(id) {
+  const r = globalRecipes.find(x => x.id === id); if(!r) return;
+  const tagHtml = r.tags.map(t => `<span class="tag-badge" style="font-size:13px; padding:4px 12px; border-radius:20px;">#${escapeHtml(t.name)}</span>`).join('');
+  const content = v('modal-recipe-content');
+  content.innerHTML = `
+    <div style="font-size: 22px; font-weight: 700; margin-bottom: 12px; color: var(--purple);">🍳 ${escapeHtml(r.title)}</div>
+    <div style="margin-bottom: 14px;">${tagHtml}</div>
+    <div class="recipe-card-pfc" style="font-size: 14px; padding: 10px; width: 100%; text-align: center; margin-bottom: 18px; border-radius:8px;">
+      🔥 <strong>${r.total_calories.toFixed(0)} kcal</strong> ／ P: <strong>${r.total_protein.toFixed(1)}g</strong> ／ F: <strong>${r.total_fat.toFixed(1)}g</strong> ／ C: <strong>${r.total_carbs.toFixed(1)}g</strong>
+    </div>
+    <div style="font-weight: 700; margin-bottom: 8px; font-size: 15px; color:var(--text)">📦 【材料・分量】</div>
+    <div class="data-list" style="max-height: none; margin-bottom: 18px; background: #f8f9fa;">
+      ${r.ingredients.map(ri => `<div class="data-item" style="padding:12px 14px;">🔹 ${escapeHtml(ri.ingredient.name)} : <strong style="color:var(--purple); margin-left:auto;">${ri.amount} ${escapeHtml(ri.ingredient.unit)}</strong></div>`).join('') || '<div class="empty">材料なし</div>'}
+    </div>
+    <div style="font-weight: 700; margin-bottom: 8px; font-size: 15px; color:var(--text)">📝 【作り方・手順・メモ】</div>
+    <div style="font-size: 15px; color: #333; background: #fff; border: 1.5px solid var(--border); padding: 16px; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; max-height:300px; overflow-y:auto;">${r.instructions ? escapeHtml(r.instructions) : '手順の記載はありません。'}</div>
+  `;
+  v('recipe-modal').style.display = 'flex';
+}
+function closeRecipeModal() { v('recipe-modal').style.display = 'none'; }
 
 async function saveIngredient() {
   if (!sv('i-name')) return toast('食材名を入力してください', true);
@@ -614,14 +704,17 @@ async function updateGoalChart() {
 
 async function refreshIngredients() {
   globalIngredients = await api('/ingredients/');
-  renderIngredientListOnly();
+}
+
+async function refreshTags() {
+  globalTags = await api('/tags/').catch(() => []);
 }
 
 async function initializeApp() {
-  v('w-date').value = today; v('m-date').value = today;
+  v('w-date').value = today; v('m-date').value = today; v('goal-chart-date').value = today;
   globalGoal = await api('/goals/').catch(() => null);
   globalRecipes = await api('/recipes/').catch(() => []);
-  await refreshIngredients();
+  await refreshIngredients(); await refreshTags();
   loadWeightPage(); renderSelectedRecipeIngredientsList();
 }
 

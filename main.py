@@ -1,12 +1,12 @@
 import os
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware  # ✨ CORS対応
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import date as date_type
 from typing import Optional
-import jwt  # PyJWTによるローカル検証
+import jwt
 import models, schemas
 from database import engine, SessionLocal
 
@@ -15,7 +15,6 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 security = HTTPBearer()
 
-# 🛡️ 指摘反映②：CORSミドルウェアの搭載（他端末や別サーバーからの通信を許可）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,34 +25,25 @@ app.add_middleware(
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
-# 暗号公開鍵（虫眼鏡）をネットから自動キャッシュ取得するクライアント
 jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL)
 
-# 🛡️ 指摘反映①：DBロールバック処理の厳格化
 def get_db():
     db = SessionLocal()
     try:
         yield db
     except Exception:
-        db.rollback()  # 途中でエラーが起きたら確実に巻き戻す
+        db.rollback()
         raise
     finally:
         db.close()
 
-# 👑 究極のログイン認証（PyJWTによるローカル高速検証版：レートリミット問題を完全回避）
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> str:
     token = credentials.credentials
     try:
         signing_key = jwks_client.get_signing_key_from_jwt(token)
-        payload = jwt.decode(
-            token, 
-            signing_key.key, 
-            algorithms=["ES256"], 
-            options={"verify_aud": False}
-        )
+        payload = jwt.decode(token, signing_key.key, algorithms=["ES256"], options={"verify_aud": False})
         user_id = payload.get("sub")
         if not user_id: raise HTTPException(status_code=401, detail="無効なトークンです")
-        
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user:
             user = models.User(id=user_id, email=payload.get("email", ""))
@@ -66,10 +56,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 @app.get("/auth/config")
 def get_auth_config():
-    return {
-        "supabase_url": SUPABASE_URL,
-        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", "")
-    }
+    return {"supabase_url": SUPABASE_URL, "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", "")}
 
 @app.get("/", response_class=HTMLResponse)
 @app.head("/")
@@ -77,6 +64,12 @@ def read_root():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(BASE_DIR, "templates", "index.html")
     with open(path, "r", encoding="utf-8") as f: return f.read()
+
+# ✨ 新設：登録されているすべてのタグ一覧を返すAPI（サジェスト用）
+@app.get("/tags/", response_model=list[str])
+def read_tags(db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
+    tags = db.query(models.Tag).all()
+    return [t.name for t in tags]
 
 # ── 1. Weight ──────────────────────────────────────
 @app.post("/weights/", response_model=schemas.WeightResponse)
@@ -112,7 +105,6 @@ def read_ingredients(db: Session = Depends(get_db), user_id: str = Depends(get_c
 def delete_ingredient(ingredient_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_ingredient = db.query(models.Ingredient).filter(models.Ingredient.id == ingredient_id).first()
     if not db_ingredient: raise HTTPException(status_code=404)
-    # 🧼 要望反映：開発・テスト用の古いゴミデータを一掃するため、一時的に削除の所有者制限を解除！
     db.delete(db_ingredient); db.commit(); return {"status": "success"}
 
 # ── 3. Recipe ──────────────────────────────────────
@@ -138,7 +130,6 @@ def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_d
         db_ri = models.RecipeIngredient(recipe_id=db_recipe.id, ingredient_id=ing_part.ingredient_id, amount=ing_part.amount)
         db.add(db_ri)
         
-    # 🛡️ 指摘反映③：タグの重複排除（setを使って同じタグが複数送られてきた場合の500エラーを防止）
     unique_tag_names = list(set([t.strip() for t in recipe_data.tags if t.strip()]))
     for tag_name in unique_tag_names:
         if tag_name.startswith("#"): tag_name = tag_name[1:]
@@ -181,7 +172,6 @@ def read_recipes(
 def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id).first()
     if not db_recipe: raise HTTPException(status_code=404)
-    # 🧼 要望反映：古いゴミレシピを一掃するため、一時的に削除制限を解除！
     db.delete(db_recipe); db.commit(); return {"status": "success"}
 
 # ── 4. MealHistory ─────────────────────────────────
