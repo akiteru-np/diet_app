@@ -1,11 +1,12 @@
 import os
-import requests  # ✨ 魔法の通信ツール
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware  # ✨ CORS対応
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import date as date_type
 from typing import Optional
+import jwt  # PyJWTによるローカル検証
 import models, schemas
 from database import engine, SessionLocal
 
@@ -14,65 +15,62 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 security = HTTPBearer()
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# 🛡️ 指摘反映②：CORSミドルウェアの搭載（他端末や別サーバーからの通信を許可）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+# 暗号公開鍵（虫眼鏡）をネットから自動キャッシュ取得するクライアント
+jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL)
+
+# 🛡️ 指摘反映①：DBロールバック処理の厳格化
 def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()  # 途中でエラーが起きたら確実に巻き戻す
+        raise
     finally:
         db.close()
 
-# 👑 究極のログイン認証（Supabase公式サーバー直接問い合わせ方式）
+# 👑 究極のログイン認証（PyJWTによるローカル高速検証版：レートリミット問題を完全回避）
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> str:
     token = credentials.credentials
-    
-    # Supabaseの認証システムへ、直接パスポートの確認をリクエストする
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "apikey": SUPABASE_ANON_KEY,
-        # ✨ 対策：ボット判定を回避するため、本物のブラウザのフリをする一言を追加
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
     try:
-        res = requests.get(f"{SUPABASE_URL.rstrip('/')}/auth/v1/user", headers=headers, timeout=5)
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token, 
+            signing_key.key, 
+            algorithms=["ES256"], 
+            options={"verify_aud": False}
+        )
+        user_id = payload.get("sub")
+        if not user_id: raise HTTPException(status_code=401, detail="無効なトークンです")
         
-        # 200番（成功）以外が返ってきたら、偽物か期限切れのトークンなので弾く
-        if res.status_code != 200:
-            raise HTTPException(status_code=401, detail="無効なトークンです")
-            
-        user_data = res.json()
-        user_id = user_data.get("id")
-        email = user_data.get("email", "")
-        
-        if not user_id:
-            raise HTTPException(status_code=401, detail="ユーザーIDの取得に失敗しました")
-            
-        # ユーザーがDBに存在するか確認（初めてのログインなら自動的にユーザー登録）
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user:
-            user = models.User(id=user_id, email=email)
-            db.add(user)
-            db.commit()
-            
+            user = models.User(id=user_id, email=payload.get("email", ""))
+            db.add(user); db.commit()
         return user_id
-        
-    except HTTPException:
-        raise
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="トークンの有効期限が切れています。再ログインしてください。")
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"認証通信エラー: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"認証に失敗しました: {str(e)}")
 
-# ── 安全なキー貸し出し窓口 ──────────────────────────
 @app.get("/auth/config")
 def get_auth_config():
     return {
         "supabase_url": SUPABASE_URL,
-        "supabase_anon_key": SUPABASE_ANON_KEY
+        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", "")
     }
 
-# ── ルート ──────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 @app.head("/")
 def read_root():
@@ -114,8 +112,7 @@ def read_ingredients(db: Session = Depends(get_db), user_id: str = Depends(get_c
 def delete_ingredient(ingredient_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_ingredient = db.query(models.Ingredient).filter(models.Ingredient.id == ingredient_id).first()
     if not db_ingredient: raise HTTPException(status_code=404)
-    if db_ingredient.user_id and db_ingredient.user_id != user_id:
-        raise HTTPException(status_code=403, detail="他人が登録した食材は削除できません")
+    # 🧼 要望反映：開発・テスト用の古いゴミデータを一掃するため、一時的に削除の所有者制限を解除！
     db.delete(db_ingredient); db.commit(); return {"status": "success"}
 
 # ── 3. Recipe ──────────────────────────────────────
@@ -141,11 +138,10 @@ def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_d
         db_ri = models.RecipeIngredient(recipe_id=db_recipe.id, ingredient_id=ing_part.ingredient_id, amount=ing_part.amount)
         db.add(db_ri)
         
-    for tag_name in recipe_data.tags:
-        tag_name = tag_name.strip()
-        if not tag_name: continue
+    # 🛡️ 指摘反映③：タグの重複排除（setを使って同じタグが複数送られてきた場合の500エラーを防止）
+    unique_tag_names = list(set([t.strip() for t in recipe_data.tags if t.strip()]))
+    for tag_name in unique_tag_names:
         if tag_name.startswith("#"): tag_name = tag_name[1:]
-        
         tag = db.query(models.Tag).filter(models.Tag.name == tag_name).first()
         if not tag:
             tag = models.Tag(name=tag_name)
@@ -185,8 +181,7 @@ def read_recipes(
 def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id).first()
     if not db_recipe: raise HTTPException(status_code=404)
-    if db_recipe.user_id != user_id:
-        raise HTTPException(status_code=403, detail="他人が作成したレシピは削除できません")
+    # 🧼 要望反映：古いゴミレシピを一掃するため、一時的に削除制限を解除！
     db.delete(db_recipe); db.commit(); return {"status": "success"}
 
 # ── 4. MealHistory ─────────────────────────────────

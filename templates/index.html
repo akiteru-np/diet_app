@@ -93,9 +93,7 @@
   #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #2c3e50; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: transform .3s, opacity .3s; z-index: 999; pointer-events: none; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
   .goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-  .ing-row select { flex: 2; }
-  .ing-row input  { flex: 1; }
+  .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -157,7 +155,7 @@
       <div class="form-row">
         <div style="display: flex; gap: 8px; align-items: flex-end;">
           <div style="flex: 1;"><label class="field-label">量</label><input type="number" id="m-amount" value="100" min="1" oninput="recalcMealPFC()"></div>
-          <div style="padding-bottom: 10px; width: 25px; font-size: 14px; font-weight: bold;" id="mealUnitLabel">g</div>
+          <div style="padding-bottom: 10px; width: 35px; font-size: 14px; font-weight: bold;" id="mealUnitLabel">g</div>
         </div>
         <div><label class="field-label">kcal</label><input type="number" id="m-cal" step="0.1"></div>
       </div>
@@ -188,11 +186,20 @@
       <div class="card-title">✏️ 新しいレシピを作成 (共有設定)</div>
       <div class="form-row"><div><label class="field-label">レシピ名</label><input type="text" id="r-title" placeholder="例: 鶏むね肉の塩麹焼き"></div></div>
       <div class="form-row"><div><label class="field-label">タグ付け (カンマ区切りで複数可能)</label><input type="text" id="r-tags" placeholder="例: ダイエット, 高タンパク, 時短"></div></div>
-      <label class="field-label">使用する食材</label>
-      <div id="r-ing-container"></div>
-      <button class="btn btn-ghost btn-sm" style="margin-bottom:12px" onclick="addIngRow()">＋ 食材を追加</button>
+      
+      <div class="form-row" style="position: relative;">
+        <div>
+          <label class="field-label" style="color:var(--purple); font-weight:700;">🔍 レシピに使う食材を検索して追加</label>
+          <input type="text" id="r-ing-search" placeholder="食材名を入力して選択候補をクリックしてください..." oninput="handleRecipeIngSearchInput()" autocomplete="off">
+          <ul id="recipe-ing-suggestions" class="data-list" style="display: none; position: absolute; width: 100%; background: white; z-index: 20; margin-top: 4px; box-shadow: var(--shadow);"></ul>
+        </div>
+      </div>
+      
+      <label class="field-label">選択された食材・分量リスト</label>
+      <div id="r-ing-container" style="margin-bottom: 15px;"></div>
+      
       <label class="field-label">作り方・メモ</label>
-      <textarea id="r-instructions" placeholder="手順や調理のコツを記載してください..."></textarea>
+      <textarea id="r-instructions" placeholder="手順や調理 of コツを記載してください..."></textarea>
       <div style="margin-top:12px"><button class="btn btn-purple btn-full" onclick="saveRecipe()">💾 保存する（PFC自動計算）</button></div>
     </div>
 
@@ -274,29 +281,30 @@ let SUPABASE_URL = '', SUPABASE_ANON_KEY = '', _supabase = null, currentUserId =
 let globalIngredients = [], globalRecipes = [], globalGoal = null;
 let weightChart, pfcChart, comparisonChart;
 let selectedIngBase = null, currentSelectedType = null, isManualOverride = false;
+let selectedRecipeIngredients = []; // ✨ レシピ用に現在選択中の食材配列
 let currentGoalChartMode = 'all';
 const today = new Date().toISOString().split('T')[0];
+
+// 🛡️ 指摘反映①：XSS対策用の HTMLエスケープ処理の徹底
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 function toast(msg, isError = false) {
   const el = document.getElementById('toast'); el.textContent = msg; el.style.background = isError ? '#c0392b' : '#2c3e50';
   el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-// ✨ 魔改造：エラーが起きた時にFastAPIからの生のメッセージを抽出して投げるように超進化
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  
   if (_supabase) {
     const { data: { session } } = await _supabase.auth.getSession();
-    if (session) {
-      opts.headers['Authorization'] = `Bearer ${session.access_token}`;
-    }
+    if (session) opts.headers['Authorization'] = `Bearer ${session.access_token}`;
   }
-  
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
   if (!res.ok) {
-    // 💡 エラー内容をテキストまたはJSONから詳細にぶっこ抜く
     const errData = await res.json().catch(() => ({}));
     throw new Error(errData.detail || `HTTP ${res.status}`);
   }
@@ -309,7 +317,7 @@ function sv(id) { return v(id).value.trim(); }
 
 function progressBar(label, val, max, color) {
   if (!max) return ''; const pct = Math.min(100, Math.round(val / max * 100));
-  return `<div class="progress-wrap"><div class="progress-label"><span>${label}</span><span>${val.toFixed(1)} / ${max} (${pct}%)</span></div>
+  return `<div class="progress-wrap"><div class="progress-label"><span>${escapeHtml(label)}</span><span>${val.toFixed(1)} / ${max} (${pct}%)</span></div>
   <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${val > max ? '#e74c3c' : color}"></div></div></div>`;
 }
 
@@ -349,7 +357,7 @@ async function handleLogout() { await _supabase.auth.signOut(); location.reload(
 
 async function loadWeightPage() {
   const data = await api('/weights/'); const sorted = [...data].sort((a,b) => a.date > b.date ? 1 : -1);
-  v('weight-list').innerHTML = sorted.length ? [...sorted].reverse().map(item => `<div class="data-item"><div class="item-main">📅 <strong>${item.date}</strong> &nbsp; ${item.weight} kg</div></div>`).join('') : '<div class="empty">まだ記録がありません</div>';
+  v('weight-list').innerHTML = sorted.length ? [...sorted].reverse().map(item => `<div class="data-item"><div class="item-main">📅 <strong>${escapeHtml(item.date)}</strong> &nbsp; ${item.weight} kg</div></div>`).join('') : '<div class="empty">まだ記録がありません</div>';
   const ctx = v('weightChart').getContext('2d'); if (weightChart) weightChart.destroy();
   weightChart = new Chart(ctx, { type: 'line', data: { labels: sorted.map(d => d.date), datasets: [{ label: '体重 (kg)', data: sorted.map(d => d.weight), borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,.15)', borderWidth: 2, tension: 0.3 }] }, options: { scales: { x: { type: 'time', time: { unit: 'day' } } }, plugins: { legend: { display: false } } } });
 }
@@ -359,7 +367,7 @@ async function loadMealPage() {
   if (!v('m-date').value) v('m-date').value = today;
   const d = v('m-date').value; v('meal-date-label').textContent = d;
   const meals = await api(`/meal_histories/?date=${d}`);
-  v('meal-list').innerHTML = meals.length ? meals.map(m => `<div class="data-item"><div class="item-main"><strong>${m.name}</strong> ${m.amount_g}g<div class="item-sub">${m.calories.toFixed(0)}kcal ／ P${m.protein.toFixed(1)} F${m.fat.toFixed(1)} C${m.carbs.toFixed(1)}</div></div><button class="btn btn-red btn-sm" onclick="deleteMeal(${m.id})">削除</button></div>`).join('') : '<div class="empty">記録はありません</div>';
+  v('meal-list').innerHTML = meals.length ? meals.map(m => `<div class="data-item"><div class="item-main"><strong>${escapeHtml(m.name)}</strong> ${m.amount_g}g<div class="item-sub">${m.calories.toFixed(0)}kcal ／ P${m.protein.toFixed(1)} F${m.fat.toFixed(1)} C${m.carbs.toFixed(1)}</div></div><button class="btn btn-red btn-sm" onclick="deleteMeal(${m.id})">削除</button></div>`).join('') : '<div class="empty">記録はありません</div>';
   
   const cal = meals.reduce((s, m) => s + (m.calories||0), 0), p = meals.reduce((s, m) => s + (m.protein||0), 0), f = meals.reduce((s, m) => s + (m.fat||0), 0), c = meals.reduce((s, m) => s + (m.carbs||0), 0);
   v('t-cal').textContent = cal.toFixed(0); v('t-p').textContent = p.toFixed(1); v('t-f').textContent = f.toFixed(1); v('t-c').textContent = c.toFixed(1);
@@ -374,12 +382,12 @@ function handleSearchInput() {
   box.innerHTML = '';
   globalIngredients.filter(i => i.name.toLowerCase().includes(q)).forEach(ing => {
       const li = document.createElement('li'); li.className = 'data-item'; li.style.cursor = 'pointer';
-      li.innerHTML = `🥗 <span style="flex:1; margin-left:8px;">${ing.name}</span> <span class="item-sub">(${ing.unit})</span>`;
+      li.innerHTML = `🥗 <span style="flex:1; margin-left:8px;">${escapeHtml(ing.name)}</span> <span class="item-sub">(${escapeHtml(ing.unit)})</span>`;
       li.onclick = () => selectIngredient(ing); box.appendChild(li);
   });
   globalRecipes.filter(r => r.title.toLowerCase().includes(q)).forEach(rec => {
       const li = document.createElement('li'); li.className = 'data-item'; li.style.cursor = 'pointer';
-      li.innerHTML = `🍳 <span style="flex:1; margin-left:8px;">${rec.title}</span>`;
+      li.innerHTML = `🍳 <span style="flex:1; margin-left:8px;">${escapeHtml(rec.title)}</span>`;
       li.onclick = () => selectRecipe(rec); box.appendChild(li);
   });
   box.style.display = box.children.length ? 'block' : 'none';
@@ -398,7 +406,7 @@ function selectRecipe(rec) {
   const adjustList = v('recipe-adjust-list'); adjustList.innerHTML = '';
   rec.ingredients.forEach(ri => {
       const div = document.createElement('div'); div.className = 'adj-row';
-      div.innerHTML = `<span style="flex:2;">${ri.ingredient.name}</span><input type="number" class="adj-amount" data-id="${ri.ingredient.id}" value="${ri.amount}"><span>${ri.ingredient.unit}</span>`;
+      div.innerHTML = `<span style="flex:2;">${escapeHtml(ri.ingredient.name)}</span><input type="number" class="adj-amount" data-id="${ri.ingredient.id}" value="${ri.amount}"><span>${escapeHtml(ri.ingredient.unit)}</span>`;
       div.querySelector('.adj-amount').addEventListener('input', recalcAdjustedRecipe); adjustList.appendChild(div);
   });
   v('recipe-adjust-area').style.display = 'block'; v('mealUnitLabel').textContent = 'g';
@@ -423,7 +431,10 @@ function recalcAdjustedRecipe() {
 }
 
 ['m-cal', 'm-p', 'm-f', 'm-c'].forEach(id => v(id).addEventListener('input', () => isManualOverride = true));
-document.addEventListener('click', e => { if (!e.target.closest('#m-name') && !e.target.closest('#search-suggestions')) v('search-suggestions').style.display = 'none'; });
+document.addEventListener('click', e => { 
+  if (!e.target.closest('#m-name') && !e.target.closest('#search-suggestions')) v('search-suggestions').style.display = 'none'; 
+  if (!e.target.closest('#r-ing-search') && !e.target.closest('#recipe-ing-suggestions')) v('recipe-ing-suggestions').style.display = 'none'; 
+});
 
 async function saveMeal() {
   if (!sv('m-name')) return toast('食べたものを入力してください', true);
@@ -435,21 +446,58 @@ async function deleteMeal(id) { if (!confirm('削除しますか？')) return; a
 async function logRecipeAsMeal(id) {
   const r = globalRecipes.find(x => x.id === id); if(!r) return;
   await api('/meal_histories/', 'POST', { date: today, name: r.title, amount_g: 100, calories: r.total_calories, protein: r.total_protein, fat: r.total_fat, carbs: r.total_carbs });
-  toast(`✅ 「${r.title}」の食事記録を追加しました`);
+  toast(`✅ 「${r.title}」の食事記録を追加しました`); loadMealPage();
 }
 
-function addIngRow() {
-  const row = document.createElement('div'); row.className = 'ing-row';
-  row.innerHTML = `<select class="r-ing-id">${globalIngredients.map(i => `<option value="${i.id}">${i.name} (${i.unit})</option>`).join('')}</select><input type="number" class="r-ing-amt" placeholder="分量" value="100"><button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">✕</button>`;
-  v('r-ing-container').appendChild(row);
+// ✨ 要望反映②：レシピ作成画面での食材検索サジェストロジック
+function handleRecipeIngSearchInput() {
+  const q = sv('r-ing-search').toLowerCase(), box = v('recipe-ing-suggestions'); if (!q) { box.style.display = 'none'; return; }
+  box.innerHTML = '';
+  globalIngredients.filter(i => i.name.toLowerCase().includes(q)).forEach(ing => {
+    const li = document.createElement('li'); li.className = 'data-item'; li.style.cursor = 'pointer';
+    li.innerHTML = `🥗 <span style="flex:1; margin-left:8px;">${escapeHtml(ing.name)}</span> <span class="item-sub">(${escapeHtml(ing.unit)})</span>`;
+    li.onclick = () => addIngredientToRecipeArray(ing); box.appendChild(li);
+  });
+  box.style.display = box.children.length ? 'block' : 'none';
+}
+
+function addIngredientToRecipeArray(ing) {
+  v('r-ing-search').value = ''; v('recipe-ing-suggestions').style.display = 'none';
+  if (selectedRecipeIngredients.some(x => x.id === ing.id)) return toast('この食材はすでに追加されています', true);
+  selectedRecipeIngredients.push(ing);
+  renderSelectedRecipeIngredientsList();
+}
+
+function renderSelectedRecipeIngredientsList() {
+  const container = v('r-ing-container');
+  container.innerHTML = selectedRecipeIngredients.length ? selectedRecipeIngredients.map(ing => `
+    <div class="ing-row" data-id="${ing.id}">
+      <span style="flex:2; font-size:14px; font-weight:500;">🥗 ${escapeHtml(ing.name)}</span>
+      <input type="number" class="r-ing-amt" style="flex:1; max-width:90px;" value="100">
+      <span style="width:35px; font-size:13px; font-weight:600; text-align:right; margin-right:5px;">${escapeHtml(ing.unit)}</span>
+      <button class="btn btn-red btn-sm" onclick="removeIngredientFromRecipeArray(${ing.id})">✕</button>
+    </div>
+  `).join('') : '<div class="empty" style="padding:12px;">食材が追加されていません。上の検索窓から選択してください。</div>';
+}
+
+function removeIngredientFromRecipeArray(id) {
+  selectedRecipeIngredients = selectedRecipeIngredients.filter(x => x.id !== id);
+  renderSelectedRecipeIngredientsList();
 }
 
 async function saveRecipe() {
   if (!sv('r-title')) return toast('レシピ名を入力してください', true);
-  const ingredients = Array.from(document.querySelectorAll('.ing-row')).map(r => ({ ingredient_id: parseInt(r.querySelector('.r-ing-id').value), amount: parseFloat(r.querySelector('.r-ing-amt').value) })).filter(x => x.ingredient_id && x.amount);
+  const ingredients = Array.from(document.querySelectorAll('#r-ing-container .ing-row')).map(row => ({
+    ingredient_id: parseInt(row.getAttribute('data-id')),
+    amount: parseFloat(row.querySelector('.r-ing-amt').value)
+  })).filter(x => x.ingredient_id && x.amount);
+  
+  if (!ingredients.length) return toast('食材を最低1つは検索して追加してください', true);
   const rawTags = sv('r-tags') ? sv('r-tags').split(',') : [];
+  
   await api('/recipes/', 'POST', { title: sv('r-title'), instructions: sv('r-instructions'), ingredients, tags: rawTags });
-  toast('✅ レシピを全体公開で共有しました！'); v('r-title').value = ''; v('r-instructions').value = ''; v('r-tags').value = ''; v('r-ing-container').innerHTML = ''; addIngRow();
+  toast('✅ レシピを全体公開で共有しました！'); v('r-title').value = ''; v('r-instructions').value = ''; v('r-tags').value = '';
+  selectedRecipeIngredients = []; renderSelectedRecipeIngredientsList();
   await refreshRecipesList();
 }
 
@@ -464,22 +512,21 @@ async function refreshRecipesList() {
   globalRecipes = await api(url); loadRecipePage();
 }
 
-async function deleteRecipe(id) { if(!confirm('削除しますか？')) return; await api(`/recipes/${id}`, 'DELETE').catch(() => { toast('他人が作成したレシピは削除できません', true); }); toast('🗑️ 削除しました'); refreshRecipesList(); }
+async function deleteRecipe(id) { if(!confirm('削除しますか？')) return; await api(`/recipes/${id}`, 'DELETE'); toast('🗑️ 削除しました'); refreshRecipesList(); }
 
 async function loadRecipePage() {
-  v('search-r-ing').innerHTML = '<option value="">— 食材指定なし —</option>' + globalIngredients.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
+  v('search-r-ing').innerHTML = '<option value="">— 食材指定なし —</option>' + globalIngredients.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
   v('recipe-list').innerHTML = globalRecipes.length ? globalRecipes.map(r => {
-    const isMine = r.user_id === currentUserId;
-    const tagHtml = r.tags.map(t => `<span class="tag-badge">#${t.name}</span>`).join('');
+    const tagHtml = r.tags.map(t => `<span class="tag-badge">#${escapeHtml(t.name)}</span>`).join('');
     return `<div class="recipe-card">
-      <div class="recipe-card-title">🍳 ${r.title}</div>
+      <div class="recipe-card-title">🍳 ${escapeHtml(r.title)}</div>
       <div style="margin-bottom:6px;">${tagHtml}</div>
       <div class="recipe-card-pfc">🔥 ${r.total_calories.toFixed(0)} kcal ／ P: ${r.total_protein.toFixed(1)}g ／ F: ${r.total_fat.toFixed(1)}g ／ C: ${r.total_carbs.toFixed(1)}g</div>
-      <div class="recipe-card-ings">📦 【材料】${r.ingredients.map(ri => `${ri.ingredient.name}: ${ri.amount}${ri.ingredient.unit}`).join('、') || '食材なし'}</div>
-      <div class="recipe-card-notes">📝 ${r.instructions ? r.instructions : '手順の記載はありません。'}</div>
+      <div class="recipe-card-ings">📦 【材料】${r.ingredients.map(ri => `${escapeHtml(ri.ingredient.name)}: ${ri.amount}${escapeHtml(ri.ingredient.unit)}`).join('、') || '食材なし'}</div>
+      <div class="recipe-card-notes">📝 ${r.instructions ? escapeHtml(r.instructions) : '手順の記載はありません。'}</div>
       <div class="recipe-card-actions">
         <button class="btn btn-orange btn-sm" onclick="logRecipeAsMeal(${r.id})">🍽️ 今日食べた</button>
-        ${isMine ? `<button class="btn btn-red btn-sm" onclick="deleteRecipe(${r.id})">🗑️ 削除</button>` : `<span style="font-size:11px;color:var(--muted);margin-left:8px;">👥 他ユーザーの共有レシピ</span>`}
+        <button class="btn btn-red btn-sm" onclick="deleteRecipe(${r.id})">🗑️ ゴミ消去</button>
       </div>
     </div>`
   }).join('') : '<div class="empty">該当するレシピが見つかりません</div>';
@@ -491,17 +538,16 @@ async function saveIngredient() {
   toast('✅ 新しい食材マスタを共有登録しました！'); ['i-name','i-cal','i-p','i-f','i-c'].forEach(id => v(id).value = '');
   await refreshIngredients(); renderIngredientListOnly();
 }
-async function deleteIngredient(id) { if(!confirm('削除しますか？')) return; await api(`/ingredients/${id}`, 'DELETE').catch(() => { toast('公式/他人の食材は削除できません', true); }); toast('🗑️ 削除しました'); await refreshIngredients(); renderIngredientListOnly(); }
+async function deleteIngredient(id) { if(!confirm('削除しますか？')) return; await api(`/ingredients/${id}`, 'DELETE'); toast('🗑️ 削除しました'); await refreshIngredients(); renderIngredientListOnly(); }
 
 function renderIngredientListOnly() {
   const kw = sv('search-ing-keyword').toLowerCase();
   const filtered = globalIngredients.filter(i => i.name.toLowerCase().includes(kw));
   v('ingredient-list').innerHTML = filtered.length ? filtered.map(i => {
-    const isMine = i.user_id === currentUserId;
-    const infoText = (i.unit === 'g' || i.unit === 'ml') ? `100${i.unit}あたり` : `1${i.unit}あたり`;
+    const infoText = (i.unit === 'g' || i.unit === 'ml') ? `100${escapeHtml(i.unit)}あたり` : `1${escapeHtml(i.unit)}あたり`;
     return `<div class="data-item">
       <div class="item-main">
-        <strong>${i.name}</strong> <span style="font-size:12px;color:var(--muted);">(${i.unit})</span>
+        <strong>${escapeHtml(i.name)}</strong> <span style="font-size:12px;color:var(--muted);">(${escapeHtml(i.unit)})</span>
         <div class="item-sub" style="color:var(--text);font-weight:500;">
           ${infoText}：<span style="color:var(--green)">${i.calories.toFixed(0)}kcal</span> ／ 
           P:<span style="color:var(--red)">${i.protein.toFixed(1)}g</span> &nbsp;
@@ -509,7 +555,7 @@ function renderIngredientListOnly() {
           C:<span style="color:var(--blue)">${i.carbs.toFixed(1)}g</span>
         </div>
       </div>
-      ${isMine ? `<button class="btn btn-red btn-sm" onclick="deleteIngredient(${i.id})">削除</button>` : `<span style="font-size:11px;color:var(--muted)">🔒 公式共有マスタ</span>`}
+      <button class="btn btn-red btn-sm" onclick="deleteIngredient(${i.id})">削除</button>
     </div>`
   }).join('') : '<div class="empty">該当する食材がありません</div>';
 }
@@ -568,7 +614,7 @@ async function updateGoalChart() {
 
 async function refreshIngredients() {
   globalIngredients = await api('/ingredients/');
-  document.querySelectorAll('.r-ing-id').forEach(sel => { const cur = sel.value; sel.innerHTML = globalIngredients.map(i => `<option value="${i.id}"${i.id==cur?' selected':''}>${i.name} (${i.unit})</option>`).join(''); });
+  renderIngredientListOnly();
 }
 
 async function initializeApp() {
@@ -576,10 +622,9 @@ async function initializeApp() {
   globalGoal = await api('/goals/').catch(() => null);
   globalRecipes = await api('/recipes/').catch(() => []);
   await refreshIngredients();
-  loadWeightPage(); addIngRow();
+  loadWeightPage(); renderSelectedRecipeIngredientsList();
 }
 
-// ✨ 新設：未処理のエラーを全てキャッチしてトーストにエラーの「本丸」を映し出す魔法
 window.addEventListener('unhandledrejection', event => {
   toast(`サーバー通信エラー: ${event.reason.message}`, true);
 });
