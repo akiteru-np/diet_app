@@ -5,7 +5,7 @@ from database import Base
 # 👤 1. ユーザーテーブル (Supabase Auth連携用)
 class User(Base):
     __tablename__ = "users"
-    id = Column(String, primary_key=True, index=True) # UUID
+    id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
 
 # 2. Weight テーブル
@@ -27,7 +27,8 @@ class Ingredient(Base):
     fat = Column(Float)
     carbs = Column(Float)
     unit = Column(String, default="g")
-    recipes = relationship("RecipeIngredient", back_populates="ingredient")
+    # リレーション
+    recipes = relationship("RecipeIngredient", back_populates="ingredient", cascade="all, delete-orphan")
 
 # 4. Recipe テーブル
 class Recipe(Base):
@@ -36,18 +37,29 @@ class Recipe(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"))
     title = Column(String, index=True)
     instructions = Column(Text)
+    # リレーション
     ingredients = relationship("RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan")
-    # ✨追加：タグとの多対多のリレーション
     tags = relationship("Tag", secondary="recipe_tags", back_populates="recipes")
 
-# ✨新設：4.2 Tag テーブル
+# ✨ 復活：レシピと食材を繋ぐ中間テーブル
+class RecipeIngredient(Base):
+    __tablename__ = "recipe_ingredients"
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id", ondelete="CASCADE"))
+    ingredient_id = Column(Integer, ForeignKey("ingredients.id", ondelete="CASCADE"))
+    amount = Column(Float)
+    # リレーション
+    recipe = relationship("Recipe", back_populates="ingredients")
+    ingredient = relationship("Ingredient", back_populates="recipes")
+
+# 4.2 Tag テーブル
 class Tag(Base):
     __tablename__ = "tags"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     recipes = relationship("Recipe", secondary="recipe_tags", back_populates="tags")
 
-# ✨新設：4.3 レシピとタグを繋ぐ中間テーブル
+# 4.3 レシピとタグを繋ぐ中間テーブル
 class RecipeTag(Base):
     __tablename__ = "recipe_tags"
     id = Column(Integer, primary_key=True, index=True)
