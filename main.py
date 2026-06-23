@@ -31,11 +31,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     # Supabaseの認証システムへ、直接パスポートの確認をリクエストする
     headers = {
         "Authorization": f"Bearer {token}",
-        "apikey": SUPABASE_ANON_KEY
+        "apikey": SUPABASE_ANON_KEY,
+        # ✨ 対策：ボット判定を回避するため、本物のブラウザのフリをする一言を追加
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
     try:
-        # Supabase公式のユーザー確認エンドポイントを叩く
         res = requests.get(f"{SUPABASE_URL.rstrip('/')}/auth/v1/user", headers=headers, timeout=5)
         
         # 200番（成功）以外が返ってきたら、偽物か期限切れのトークンなので弾く

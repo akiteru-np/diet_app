@@ -282,7 +282,7 @@ function toast(msg, isError = false) {
   el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-// ✨ 魔改造：通信する瞬間に、Supabaseから「常に最新の（期限切れじゃない）トークン」をその場で取得して載せる
+// ✨ 魔改造：エラーが起きた時にFastAPIからの生のメッセージを抽出して投げるように超進化
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   
@@ -295,7 +295,11 @@ async function api(path, method = 'GET', body = null) {
   
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    // 💡 エラー内容をテキストまたはJSONから詳細にぶっこ抜く
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || `HTTP ${res.status}`);
+  }
   return res.status === 204 ? null : res.json();
 }
 
@@ -574,6 +578,11 @@ async function initializeApp() {
   await refreshIngredients();
   loadWeightPage(); addIngRow();
 }
+
+// ✨ 新設：未処理のエラーを全てキャッチしてトーストにエラーの「本丸」を映し出す魔法
+window.addEventListener('unhandledrejection', event => {
+  toast(`サーバー通信エラー: ${event.reason.message}`, true);
+});
 
 window.addEventListener('DOMContentLoaded', async () => {
   try {
