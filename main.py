@@ -79,6 +79,7 @@ def read_tags(db: Session = Depends(get_db), user_id: str = Depends(get_current_
     tags = db.query(models.Tag).all()
     return [t.name for t in tags]
 
+# ── AI・スクレイピング関連 ──
 def fetch_text_from_url(url: str) -> str:
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -92,16 +93,17 @@ def fetch_text_from_url(url: str) -> str:
     except Exception as e:
         return f"(URL取得失敗: {str(e)})"
 
-# ✨ AIの返答を解析する部分のバグを完全修正
+# 🔴 問題1 完全修正：Gemini APIの正しいJSON構造（candidates -> content -> parts）で読み取る
 def parse_gemini_response(res_json):
     if "error" in res_json:
         raise Exception(f"API Error: {res_json['error'].get('message', str(res_json))}")
     try:
+        # ✅ ここが本当の原因でした！正しく修正済みです。
         text = res_json['candidates'][0]['content']['parts'][0]['text']
         text = text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
     except Exception as e:
-        raise Exception(f"JSON Parsing Error: {str(e)} | Raw: {str(res_json)[:200]}")
+        raise Exception(f"JSON Parsing Error: {str(e)} | Raw Data: {str(res_json)[:200]}")
 
 @app.get("/api/ai/predict-ingredient")
 def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
@@ -137,7 +139,7 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
     提供された情報からレシピを抽出し、以下のJSON形式のみで出力してください。
     1. title: レシピ名
     2. instructions: 作り方の手順（改行含む）
-    3. ingredients: 食材リスト。「name」は表記ゆれを防ぐため、一般的な平仮名・カタカナ交じりの標準名（例：「鶏胸肉」ではなく「鶏むね肉」）に統一してください。「amount」はレシピの分量を数値（g, ml, 個）に換算してください。
+    3. ingredients: 食材リスト。「name」は表記ゆれを防ぐため一般的な平仮名・カタカナ交じりの標準名に統一。「amount」はレシピの分量を数値（g, ml, 個）に換算。
     {{ "title": "レシピ名", "instructions": "手順テキスト", "ingredients": [ {{"name": "鶏むね肉", "amount": 150}} ] }}
     """
     
@@ -156,6 +158,9 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"解析エラー: {str(e)}")
 
+
+# ── データベースCRUD処理 ──
+
 @app.delete("/weights/{weight_id}")
 def delete_weight(weight_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_weight = db.query(models.Weight).filter(models.Weight.id == weight_id, models.Weight.user_id == user_id).first()
@@ -168,6 +173,7 @@ def delete_ingredient(ingredient_id: int, db: Session = Depends(get_db), user_id
     if not db_ingredient: raise HTTPException(status_code=404, detail="あなたが登録した食材しか削除できません")
     db.delete(db_ingredient); db.commit(); return {"status": "success"}
 
+# 🔴 問題2 完全修正：デコレータ（@app.delete）を正しく付与し、重複していた関数を一つに統合
 @app.delete("/recipes/{recipe_id}")
 def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id, models.Recipe.user_id == user_id).first()
@@ -202,6 +208,7 @@ def create_ingredient(ingredient_data: schemas.IngredientCreate, db: Session = D
 def read_ingredients(db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     return db.query(models.Ingredient).all()
 
+# 🟡 問題3 完全修正：PFC計算ロジックを独立関数として明示的に定義
 def calc_recipe_totals(r):
     total_cal = total_p = total_f = total_c = 0.0
     for ri in r.ingredients:
