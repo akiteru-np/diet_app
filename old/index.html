@@ -115,16 +115,13 @@
   .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
   
   @keyframes modalOpen { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  
-  .ai-loading { animation: pulse 1.5s infinite ease-in-out; opacity: 0.6; pointer-events: none; }
-  @keyframes pulse { 0% { opacity:0.4; } 50% { opacity:1; } 100% { opacity:0.4; } }
 </style>
 </head>
 <body>
 
 <div id="auth-screen">
   <div class="card" style="max-width: 400px; text-align: center;">
-    <img src="/static/icon.png" alt="アイコン" style="width: 80px; height: 80px; border-radius: 20px; margin-bottom: 10px;" onerror="this.style.display='none'">
+    <img src="/static/icon.png" alt="アイコン" style="width: 80px; height: 80px; border-radius: 20px; margin-bottom: 10px;">
     <div class="card-title" style="justify-content: center; font-size: 20px;">目指せ理想のBody</div>
     <p style="color: var(--muted); font-size: 13px; margin-bottom: 20px;">共有食材＆レシピ対応型システム</p>
     
@@ -220,22 +217,6 @@
   </section>
 
   <section id="page-recipe" class="page">
-    <div class="card" style="border: 2px solid #9b59b6; background: #faf3ff;">
-      <div class="card-title" style="color: #8e44ad;">🤖 AIレシピ自動インポート (Version 2.0)</div>
-      <p style="font-size:12px; color: var(--muted); margin-bottom:12px;">レシピサイトURL、バズレシピ動画情報、テキストのコピペ、または料理の画像を投げるだけで、AIがレシピ名・手順・全食材の量を自動抽出・自動マスタ登録して一発セットします！※タグは後から自分で管理できます。</p>
-      
-      <div class="form-row">
-        <div><label class="field-label">レシピのURL（バズレシピも可）</label><input type="text" id="ai-r-url" placeholder="https://bazurecipe.com/..."></div>
-      </div>
-      <div class="form-row">
-        <div><label class="field-label">レシピテキスト（コピペ）</label><textarea id="ai-r-text" placeholder="ここに材料や作り方のテキストをそのまま貼り付けても解析できます..."></textarea></div>
-      </div>
-      <div class="form-row">
-        <div><label class="field-label">料理・レシピの画像（マルチモーダル解析）</label><input type="file" id="ai-r-image" accept="image/*"></div>
-      </div>
-      <button class="btn btn-purple btn-full" id="btn-ai-recipe-import" onclick="importRecipeViaAI()">⚡ AIでレシピを一発自動入力する</button>
-    </div>
-
     <div class="card">
       <div class="card-title">✏️ 新しいレシピを作成 (共有設定)</div>
       <div class="form-row"><div><label class="field-label">レシピ名</label><input type="text" id="r-title" placeholder="例: 鶏むね肉の塩麹焼き"></div></div>
@@ -286,12 +267,7 @@
     <div class="card">
       <div class="card-title">➕ 新しい食材を登録する (共有設定)</div>
       <div class="form-row">
-        <div style="flex: 2;"><label class="field-label">食材名</label><input type="text" id="i-name" placeholder="例: しょうゆ、鶏もも肉、卵"></div>
-        <div style="flex: 1; display: flex; align-items: flex-end; padding-bottom: 2px;">
-          <button class="btn btn-purple btn-full" id="btn-ai-predict-ing" onclick="triggerAIIngredientPrediction()" style="font-size: 12px; padding: 11px 4px;">🧠 AIデータ自動検索</button>
-        </div>
-      </div>
-      <div class="form-row">
+        <div><label class="field-label">食材名</label><input type="text" id="i-name" placeholder="例: 鶏むね肉"></div>
         <div><label class="field-label">単位</label><select id="i-unit"><option value="g">g (100gあたり)</option><option value="個">個 (1個あたり)</option><option value="ml">ml (100mlあたり)</option></select></div>
       </div>
       <div class="form-row">
@@ -368,87 +344,19 @@ function toast(msg, isError = false) {
   el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2800);
 }
 
+// ✨ パスワードの見える化処理
 function togglePasswordVisibility() {
-  const pwd = v('auth-password'); pwd.type = pwd.type === 'password' ? 'text' : 'password';
+  const pwd = v('auth-password');
+  pwd.type = pwd.type === 'password' ? 'text' : 'password';
 }
 
+// ✨ マジックリンク（パスワード不要）の処理
 async function handleMagicLink() {
-  const email = sv('auth-email'); if (!email) return toast('メールアドレスを入力してください', true);
+  const email = sv('auth-email');
+  if (!email) return toast('メールアドレスを入力してください', true);
   const { error } = await _supabase.auth.signInWithOtp({ email });
   if (error) return toast('送信失敗: ' + error.message, true);
-  toast('✨ ログイン用リンクをメールに送信しました！確認してください。');
-}
-
-async function handleLogout() { 
-  if (!confirm('ログアウトしてもよろしいですか？\\n(同じスマホ・ブラウザならログアウトしなければ次回から自動ログインできます)')) return;
-  await _supabase.auth.signOut(); location.reload(); 
-}
-
-async function triggerAIIngredientPrediction() {
-  const name = sv('i-name'); if(!name) return toast('食材名を入力してください', true);
-  const btn = v('btn-ai-predict-ing');
-  btn.classList.add('ai-loading'); btn.textContent = '🧠 AIデータ検索中...';
-  try {
-    const res = await api(`/api/ai/predict-ingredient?name=${encodeURIComponent(name)}`);
-    v('i-unit').value = res.unit;
-    v('i-cal').value = res.calories;
-    v('i-p').value = res.protein;
-    v('i-f').value = res.fat;
-    v('i-c').value = res.carbs;
-    toast(`✅ AIが「${name}」の単位とPFC情報を自動算出しました！`);
-  } catch(e) {
-    toast(`AI予測に失敗しました。キー設定を確認してください。`, true);
-  } finally {
-    btn.classList.remove('ai-loading'); btn.textContent = '🧠 AIデータ自動検索';
-  }
-}
-
-async function importRecipeViaAI() {
-  const urlVal = sv('ai-r-url'), textVal = sv('ai-r-text'), fileInput = v('ai-r-image');
-  if(!urlVal && !textVal && !fileInput.files.length) return toast('URL、テキスト、または画像のいずれかを入力してください', true);
-  
-  const btn = v('btn-ai-recipe-import');
-  btn.classList.add('ai-loading'); btn.textContent = '🤖 AIがレシピをディープ解析中...';
-  
-  let imgB64 = null;
-  if(fileInput.files.length) {
-    const file = fileInput.files[0];
-    imgB64 = await new Promise((resolve) => {
-      const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(file);
-    });
-  }
-  
-  try {
-    const aiResult = await api('/api/ai/analyze-recipe', 'POST', { text: textVal, url: urlVal, image_base64: imgB64 });
-    
-    v('r-title').value = aiResult.title;
-    v('r-instructions').value = aiResult.instructions;
-    
-    selectedRecipeIngredients = [];
-    toast(`🍳 料理「${aiResult.title}」を解析。食材マスタとの同期を開始...`);
-    
-    for(const aiIng of aiResult.ingredients) {
-      let matched = globalIngredients.find(x => x.name.toLowerCase() === aiIng.name.toLowerCase());
-      if(!matched) {
-        try {
-          const pred = await api(`/api/ai/predict-ingredient?name=${encodeURIComponent(aiIng.name)}`);
-          matched = await api('/ingredients/', 'POST', { name: aiIng.name, unit: pred.unit, calories: pred.calories, protein: pred.protein, fat: pred.fat, carbs: pred.carbs });
-          globalIngredients.push(matched); 
-        } catch(err) {
-          matched = await api('/ingredients/', 'POST', { name: aiIng.name, unit: 'g', calories: 0, protein: 0, fat: 0, carbs: 0 });
-          globalIngredients.push(matched);
-        }
-      }
-      selectedRecipeIngredients.push({ id: matched.id, name: matched.name, unit: matched.unit, amount: aiIng.amount });
-    }
-    
-    renderSelectedRecipeIngredientsList();
-    toast(`🎉 AIインポート完了！レシピをご確認の上保存してください（タグは未入力です）`);
-  } catch(e) {
-    toast(`AIレシピ解析に失敗しました: ${e.message}`, true);
-  } finally {
-    btn.classList.remove('ai-loading'); btn.textContent = '⚡ AIでレシピを一発自動入力する';
-  }
+  toast('✨ ログイン用リンクをメールに送信しました！メールBOXを確認してください。');
 }
 
 async function api(path, method = 'GET', body = null) {
@@ -485,10 +393,7 @@ function switchPage(name) {
   if (name === 'weight') loadWeightPage();
   if (name === 'text-meal') loadMealPage();
   if (name === 'recipe') loadRecipePage();
-  
-  // ✨ 今回の修正（これが抜けていました）
   if (name === 'ingredient') loadIngredientPage();
-  
   if (name === 'goal') loadGoalPage();
 }
 
@@ -512,6 +417,7 @@ async function handleSignup() {
   const { error } = await _supabase.auth.signUp({ email, password }); if(error) return toast('登録失敗: ' + error.message, true);
   toast('✅ 登録成功！ログインしました'); checkSession();
 }
+async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
 async function loadWeightPage() {
   const data = await api('/weights/'); const sorted = [...data].sort((a,b) => a.date > b.date ? 1 : -1);
@@ -609,6 +515,11 @@ async function saveMeal() {
   v('recipe-adjust-area').style.display = 'none'; currentSelectedType = null; loadMealPage();
 }
 async function deleteMeal(id) { if (!confirm('削除しますか？')) return; await api(`/meals/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadMealPage(); }
+async function logRecipeAsMeal(id) {
+  const r = globalRecipes.find(x => x.id === id); if(!r) return;
+  await api('/meal_histories/', 'POST', { date: today, name: r.title, amount_g: 100, calories: r.total_calories, protein: r.total_protein, fat: r.total_fat, carbs: r.total_carbs });
+  toast(`✅ 「${r.title}」の食事記録を追加しました`); loadMealPage();
+}
 
 function handleRecipeIngSearchInput() {
   const q = sv('r-ing-search').toLowerCase(), box = v('recipe-ing-suggestions'); if (!q) { box.style.display = 'none'; return; }
@@ -624,8 +535,7 @@ function handleRecipeIngSearchInput() {
 function addIngredientToRecipeArray(ing) {
   v('r-ing-search').value = ''; v('recipe-ing-suggestions').style.display = 'none';
   if (selectedRecipeIngredients.some(x => x.id === ing.id)) return toast('この食材はすでに追加されています', true);
-  selectedRecipeIngredients.push({ id: ing.id, name: ing.name, unit: ing.unit, amount: 100 });
-  renderSelectedRecipeIngredientsList();
+  selectedRecipeIngredients.push(ing); renderSelectedRecipeIngredientsList();
 }
 
 function renderSelectedRecipeIngredientsList() {
@@ -633,7 +543,7 @@ function renderSelectedRecipeIngredientsList() {
   container.innerHTML = selectedRecipeIngredients.length ? selectedRecipeIngredients.map(ing => `
     <div class="ing-row" data-id="${ing.id}">
       <span style="flex:2; font-size:14px; font-weight:500;">🥗 ${escapeHtml(ing.name)}</span>
-      <input type="number" class="r-ing-amt" style="flex:1; max-width:90px;" value="${ing.amount}">
+      <input type="number" class="r-ing-amt" style="flex:1; max-width:90px;" value="100">
       <span style="width:35px; font-size:13px; font-weight:600; text-align:right; margin-right:5px;">${escapeHtml(ing.unit)}</span>
       <button class="btn btn-red btn-sm" onclick="removeIngredientFromRecipeArray(${ing.id})">✕</button>
     </div>
@@ -652,9 +562,12 @@ function renderTagSuggestions() {
   const input = v('r-tags'), box = v('tag-suggestions'), val = input.value;
   const parts = val.split(',');
   const lastPart = parts[parts.length - 1].trim().toLowerCase();
+  
   box.innerHTML = '';
   const filtered = globalTags.filter(t => t.toLowerCase().includes(lastPart));
+  
   if (!filtered.length) { box.style.display = 'none'; return; }
+  
   filtered.forEach(tagName => {
     const li = document.createElement('li'); li.className = 'data-item'; li.style.cursor = 'pointer';
     li.innerHTML = `#🏷️ <span style="flex:1; margin-left:8px; font-weight:500;">${escapeHtml(tagName)}</span>`;
@@ -700,6 +613,8 @@ async function loadRecipePage() {
   v('search-r-ing').innerHTML = '<option value="">— 食材指定なし —</option>' + globalIngredients.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
   v('recipe-list').innerHTML = globalRecipes.length ? globalRecipes.map(r => {
     const tagHtml = r.tags.map(t => `<span class="tag-badge">#${escapeHtml(t.name)}</span>`).join('');
+    
+    // ✨ カード全体に onclick を追加してタップ可能に！
     return `<div class="recipe-card" onclick="openRecipeModal(${r.id})">
       <div class="recipe-card-title">🍳 ${escapeHtml(r.title)}</div>
       <div style="margin-bottom:6px;">${tagHtml}</div>
@@ -707,8 +622,10 @@ async function loadRecipePage() {
       <div class="recipe-card-ings" style="margin-bottom:10px;">📦 【材料】${r.ingredients.map(ri => `${escapeHtml(ri.ingredient.name)}: ${ri.amount}${escapeHtml(ri.ingredient.unit)}`).join('、') || '食材なし'}</div>
       <div class="recipe-card-notes" style="margin-bottom:12px;">📝 ${r.instructions ? escapeHtml(r.instructions) : '手順の記載はありません。'}</div>
       <div class="recipe-card-actions" style="display:flex; gap:6px;">
+        
         <button class="btn btn-orange btn-sm" onclick="event.stopPropagation(); logRecipeAsMeal(${r.id})">🍽️ 今日食べた</button>
-        <button class="btn btn-red btn-sm" onclick="event.stopPropagation(); deleteRecipe(${r.id})">🗑️ 消去</button>
+        <button class="btn btn-red btn-sm" onclick="event.stopPropagation(); deleteRecipe(${r.id})">🗑️ ゴミ消去</button>
+        
       </div>
     </div>`
   }).join('') : '<div class="empty">該当するレシピが見つかりません</div>';
@@ -742,11 +659,6 @@ async function saveIngredient() {
   await refreshIngredients(); renderIngredientListOnly();
 }
 async function deleteIngredient(id) { if(!confirm('削除しますか？')) return; await api(`/ingredients/${id}`, 'DELETE'); toast('🗑️ 削除しました'); await refreshIngredients(); renderIngredientListOnly(); }
-
-// ✨ 今回の修正（食材一覧を出すための関数）
-function loadIngredientPage() {
-  renderIngredientListOnly();
-}
 
 function renderIngredientListOnly() {
   const kw = sv('search-ing-keyword').toLowerCase();

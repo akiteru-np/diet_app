@@ -1,15 +1,12 @@
 import os
-import json
-import requests
-import re
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.staticfiles import StaticFiles
+from fastapi.staticfiles import StaticFiles # ✨ 画像を読み込むための機能
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional, List
+from datetime import date as date_type
+from typing import Optional
 import jwt
 import models, schemas
 from database import engine, SessionLocal
@@ -27,14 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✨ アイコンなどを置くstaticフォルダを認識させる
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
 jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL)
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 def get_db():
     db = SessionLocal()
@@ -79,117 +75,7 @@ def read_tags(db: Session = Depends(get_db), user_id: str = Depends(get_current_
     tags = db.query(models.Tag).all()
     return [t.name for t in tags]
 
-@app.get("/api/ai/predict-ingredient")
-def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=400, detail="Renderの環境変数にGEMINI_API_KEYが設定されていません")
-    
-    # ✨ 修正済み：モデル名に -latest を付与
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
-    
-    prompt = f"""
-    食材名「{name}」について、日本の自炊レシピにおける一般的な使われ方を考慮し、最も適合する単位（g, 個, ml）を1つ選択してください。
-    さらに、農林水産省や日本食品標準成分表の公式データを基準として、その単位あたり（gとmlは100あたり、個は1個あたり）のカロリー(kcal)、タンパク質(P/g)、脂質(F/g)、炭水化物(C/g)の数値を予測してください。
-
-    【単位の選定基準】
-    - レシピで大さじ、小さじ、液体など体積で使われることが多い場合（例：しょうゆ、塩、水、牛乳、酒、みりん、酢、油など）は「ml」
-    - 個数や玉数で使われることが多い場合（例：卵、ピーマン、玉ねぎ、じゃがいも、アボカドなど）は「個」
-    - グラム単位で使われることが多い場合（例：お米、豚肉、牛肉、鶏肉、鮭、マグロなど）は「g」
-
-    必ず以下の正確なJSONオブジェクトのみを返答してください。前後の説明文やマークダウンは一切含めないでください。
-    {{
-        "unit": "g" または "個" または "ml",
-        "calories": カロリー（数値）,
-        "protein": タンパク質（g、数値）,
-        "fat": 脂質（g、数値）,
-        "carbs": 炭水化物（g、数値）
-    }}
-    """
-    
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json"}
-    }
-    
-    try:
-        res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=12)
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Gemini APIエラー: {res.text}")
-        text_res = res.json()['contents'][0]['parts'][0]['text']
-        return json.loads(text_res)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI予測エラー: {str(e)}")
-
-def fetch_text_from_url(url: str) -> str:
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        res = requests.get(url, headers=headers, timeout=10)
-        res.raise_for_status()
-        html = res.text
-        html = re.sub(r'<script.*?>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
-        html = re.sub(r'<style.*?>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r'<[^>]+>', ' ', html)
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text[:15000]
-    except Exception as e:
-        return f"(URL先のテキスト取得に失敗しました: {str(e)})"
-
-class RecipeAIRequest(BaseModel):
-    text: Optional[str] = None
-    url: Optional[str] = None
-    image_base64: Optional[str] = None
-
-@app.post("/api/ai/analyze-recipe")
-def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_user)):
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=400, detail="Renderの環境変数にGEMINI_API_KEYが設定されていません")
-    
-    # ✨ 修正済み：モデル名に -latest を付与
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
-    
-    prompt = """
-    提供された情報（料理の画像、レシピテキスト、サイトURLから抽出した内容など）を徹底的に解析し、以下のJSONフォーマットに従ってレシピ情報を抽出してください。
-    
-    【抽出・変換ルール】
-    1. title: レシピの名前（料理名）を決定してください。
-    2. instructions: 作り方の手順やメモを、ユーザーがそのままコピペして読めるよう綺麗にフォーマットしたテキスト（改行含む）にしてください。
-    3. ingredients: レシピに含まれる食材とそれぞれの量を抽出してください。「name」には一般的な食材名（例：豚バラ肉、キャベツなど）を指定し、「amount」にはレシピで指定されている量を適切な数値（gやml換算の推測値、または個数）で入れてください。少々（塩など）は適当なg数に換算してください。
-    
-    必ず以下の正確なJSONオブジェクトのみを返答してください。余計な解説やマークダウンの装飾は一切含めないでください。
-    {{
-        "title": "レシピ名",
-        "instructions": "作り方の手順テキスト",
-        "ingredients": [
-            {{"name": "食材名1", "amount": 150}},
-            {{"name": "食材名2", "amount": 1}}
-        ]
-    }}
-    """
-    
-    parts = []
-    if req.text: parts.append({"text": f"【解析対象のテキスト】\n{req.text}"})
-    if req.url:
-        scraped_text = fetch_text_from_url(req.url)
-        parts.append({"text": f"【参照URL（{req.url}）から抽出したウェブページの内容】\n{scraped_text}"})
-    if req.image_base64:
-        b64 = req.image_base64.split(",")[1] if "," in req.image_base64 else req.image_base64
-        parts.append({"inlineData": {"mimeType": "image/jpeg", "data": b64}})
-        
-    parts.append({"text": prompt})
-    payload = {
-        "contents": [{"parts": parts}],
-        "generationConfig": {"responseMimeType": "application/json"}
-    }
-    
-    try:
-        res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=25)
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Gemini APIエラー: {res.text}")
-        text_res = res.json()['contents'][0]['parts'][0]['text']
-        return json.loads(text_res)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"{str(e)}")
-
+# ── 以下、前回と同じAPI群（Weights, Ingredients, Recipes, Meals, Goals） ──
 @app.post("/weights/", response_model=schemas.WeightResponse)
 def create_weight(weight_data: schemas.WeightCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     existing = db.query(models.Weight).filter(models.Weight.user_id == user_id, models.Weight.date == weight_data.date).first()
@@ -224,10 +110,18 @@ def delete_ingredient(ingredient_id: int, db: Session = Depends(get_db), user_id
     if not db_ingredient: raise HTTPException(status_code=404)
     db.delete(db_ingredient); db.commit(); return {"status": "success"}
 
-def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
-    db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id).first()
-    if not db_recipe: raise HTTPException(status_code=404)
-    db.delete(db_recipe); db.commit(); return {"status": "success"}
+def calc_recipe_totals(r):
+    total_cal = total_p = total_f = total_c = 0.0
+    for ri in r.ingredients:
+        ing = ri.ingredient
+        if not ing: continue
+        factor = ri.amount / 100.0 if ing.unit == "g" else ri.amount
+        total_cal += (ing.calories or 0) * factor
+        total_p   += (ing.protein  or 0) * factor
+        total_f   += (ing.fat      or 0) * factor
+        total_c   += (ing.carbs    or 0) * factor
+    r.total_calories, r.total_protein, r.total_fat, r.total_carbs = total_cal, total_p, total_f, total_c
+    return r
 
 @app.post("/recipes/", response_model=schemas.RecipeResponse)
 def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
@@ -266,8 +160,10 @@ def read_recipes(
     return calculated
 
 @app.delete("/recipes/{recipe_id}")
-def delete_recipe_endpoint(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
-    return delete_recipe(recipe_id, db, user_id)
+def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
+    db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id).first()
+    if not db_recipe: raise HTTPException(status_code=404)
+    db.delete(db_recipe); db.commit(); return {"status": "success"}
 
 @app.post("/meal_histories/", response_model=schemas.MealHistoryResponse)
 def create_meal_history(meal_data: schemas.MealHistoryCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
