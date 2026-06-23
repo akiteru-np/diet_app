@@ -85,7 +85,20 @@
   .progress-track { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
   .progress-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
   
-  .recipe-card { border-left: 4px solid var(--purple); background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .recipe-card { 
+    border-left: 4px solid var(--purple); 
+    background: var(--card); 
+    border-radius: var(--radius); 
+    padding: 16px; 
+    margin-bottom: 12px; 
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .recipe-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  }
   .recipe-card-title { font-weight: 600; font-size: 15px; color: var(--text); margin-bottom: 6px; }
   .recipe-card-pfc { font-size: 12px; color: var(--purple); background: var(--purple-lt); padding: 4px 10px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
   .recipe-card-ings { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
@@ -600,16 +613,19 @@ async function loadRecipePage() {
   v('search-r-ing').innerHTML = '<option value="">— 食材指定なし —</option>' + globalIngredients.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
   v('recipe-list').innerHTML = globalRecipes.length ? globalRecipes.map(r => {
     const tagHtml = r.tags.map(t => `<span class="tag-badge">#${escapeHtml(t.name)}</span>`).join('');
-    return `<div class="recipe-card">
+    
+    // ✨ カード全体に onclick を追加してタップ可能に！
+    return `<div class="recipe-card" onclick="openRecipeModal(${r.id})">
       <div class="recipe-card-title">🍳 ${escapeHtml(r.title)}</div>
       <div style="margin-bottom:6px;">${tagHtml}</div>
       <div class="recipe-card-pfc">🔥 ${r.total_calories.toFixed(0)} kcal ／ P: ${r.total_protein.toFixed(1)}g ／ F: ${r.total_fat.toFixed(1)}g ／ C: ${r.total_carbs.toFixed(1)}g</div>
       <div class="recipe-card-ings" style="margin-bottom:10px;">📦 【材料】${r.ingredients.map(ri => `${escapeHtml(ri.ingredient.name)}: ${ri.amount}${escapeHtml(ri.ingredient.unit)}`).join('、') || '食材なし'}</div>
       <div class="recipe-card-notes" style="margin-bottom:12px;">📝 ${r.instructions ? escapeHtml(r.instructions) : '手順の記載はありません。'}</div>
       <div class="recipe-card-actions" style="display:flex; gap:6px;">
-        <button class="btn btn-orange btn-sm" onclick="logRecipeAsMeal(${r.id})">🍽️ 今日食べた</button>
-        <button class="btn btn-purple btn-sm" onclick="openRecipeModal(${r.id})">📖 材料・手順を拡大表示</button>
-        <button class="btn btn-red btn-sm" onclick="deleteRecipe(${r.id})">🗑️ 消去</button>
+        
+        <button class="btn btn-orange btn-sm" onclick="event.stopPropagation(); logRecipeAsMeal(${r.id})">🍽️ 今日食べた</button>
+        <button class="btn btn-red btn-sm" onclick="event.stopPropagation(); deleteRecipe(${r.id})">🗑️ ゴミ消去</button>
+        
       </div>
     </div>`
   }).join('') : '<div class="empty">該当するレシピが見つかりません</div>';
