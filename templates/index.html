@@ -1,4 +1,140 @@
-<div class="card">
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diet Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+<style>
+  :root {
+    --green:   #27ae60; --green-lt: #eafaf1; --green-dk: #1e8449;
+    --orange:  #e67e22; --orange-lt: #fef5ec;
+    --purple:  #8e44ad; --purple-lt: #f5eef8;
+    --blue:    #2980b9; --blue-lt:   #eaf4fb;
+    --red:     #e74c3c; --red-lt:    #fdedec;
+    --text:    #2c3e50; --muted: #7f8c8d; --border: #e5e8ed;
+    --bg:      #f0f3f7; --card:  #fff;
+    --radius:  12px; --shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); font-size: 15px; }
+
+  /* ── レイアウト ── */
+  .app { max-width: 700px; margin: 0 auto; padding: 16px; }
+  .nav { display: flex; gap: 4px; background: var(--card); border-radius: var(--radius);
+         padding: 6px; box-shadow: var(--shadow); margin-bottom: 20px; overflow-x: auto; }
+  .nav-btn { flex: 1; min-width: 80px; padding: 8px 4px; border: none; background: none;
+             border-radius: 8px; font-size: 13px; cursor: pointer; color: var(--muted);
+             display: flex; flex-direction: column; align-items: center; gap: 3px;
+             transition: background .15s, color .15s; white-space: nowrap; }
+  .nav-btn .icon { font-size: 20px; }
+  .nav-btn.active { background: var(--green); color: #fff; }
+  .nav-btn:hover:not(.active) { background: var(--green-lt); color: var(--green); }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── カード ── */
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+          padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex;
+                align-items: center; gap: 8px; }
+
+  /* ── フォーム部品 ── */
+  .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .form-row > * { flex: 1; min-width: 100px; }
+  input, select, textarea {
+    width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: 14px; color: var(--text);
+    background: #fff; transition: border-color .15s; outline: none; font-family: inherit; }
+  input:focus, select:focus, textarea:focus { border-color: var(--green); }
+  textarea { resize: vertical; min-height: 70px; }
+  label.field-label { font-size: 12px; font-weight: 600; color: var(--muted);
+                      display: block; margin-bottom: 4px; text-transform: uppercase; }
+
+  /* ── ボタン ── */
+  .btn { padding: 10px 18px; border: none; border-radius: 8px; font-size: 14px;
+         font-weight: 500; cursor: pointer; transition: opacity .15s, transform .1s;
+         display: inline-flex; align-items: center; gap: 6px; }
+  .btn:active { transform: scale(.97); }
+  .btn-green  { background: var(--green);  color: #fff; }
+  .btn-green:hover  { background: var(--green-dk); }
+  .btn-orange { background: var(--orange); color: #fff; }
+  .btn-purple { background: var(--purple); color: #fff; }
+  .btn-blue   { background: var(--blue);   color: #fff; }
+  .btn-red    { background: var(--red-lt); color: var(--red); }
+  .btn-red:hover    { background: var(--red); color: #fff; }
+  .btn-ghost  { background: #f4f5f7; color: var(--muted); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+  .btn-full { width: 100%; justify-content: center; }
+
+  /* ── リスト ── */
+  .data-list { border: 1.5px solid var(--border); border-radius: 10px; max-height: 220px; overflow-y: auto; }
+  .data-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .data-item:last-child { border-bottom: none; }
+  .data-item .item-main { flex: 1; }
+  .data-item .item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── その他 ── */
+  .pfc-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .pfc-pill { flex: 1; min-width: 70px; padding: 10px; border-radius: 10px; text-align: center; }
+  .pfc-pill .pfc-val { font-size: 20px; font-weight: 600; }
+  .pfc-pill .pfc-lbl { font-size: 11px; margin-top: 2px; }
+  .pfc-p { background: var(--blue-lt);   color: var(--blue); }
+  .pfc-f { background: var(--red-lt);    color: var(--red); }
+  .pfc-c { background: var(--orange-lt); color: var(--orange); }
+  .pfc-k { background: var(--green-lt);  color: var(--green); }
+  .progress-wrap { margin-bottom: 10px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .progress-track { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+  .recipe-card { border-left: 4px solid var(--purple); background: var(--purple-lt); border-radius: 0 10px 10px 0; padding: 14px; margin-bottom: 12px; }
+  .recipe-card-title { font-weight: 600; font-size: 15px; color: var(--purple); margin-bottom: 6px; }
+  .recipe-card-pfc { font-size: 12px; color: var(--blue); background: #eaf2f8; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+  .recipe-card-ings { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .recipe-card-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .ing-row select { flex: 2; }
+  .ing-row input  { flex: 1; }
+  .proposal-card { border-left: 4px solid var(--orange); background: var(--orange-lt); border-radius: 0 10px 10px 0; padding: 14px; margin-bottom: 12px; }
+  .proposal-title { font-weight: 600; font-size: 15px; color: var(--orange); margin-bottom: 6px; }
+  .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 14px; }
+  .chart-wrap { position: relative; }
+  .chart-wrap canvas { max-height: 260px; }
+  .chart-wrap-sm canvas { max-height: 200px; max-width: 200px; margin: 0 auto; display: block; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #2c3e50; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: transform .3s, opacity .3s; z-index: 999; pointer-events: none; }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="nav" role="navigation">
+    <button class="nav-btn active" onclick="switchPage('weight')"><span class="icon">⚖️</span><span>体重</span></button>
+    <button class="nav-btn" onclick="switchPage('meal')"><span class="icon">🍽️</span><span>食事</span></button>
+    <button class="nav-btn" onclick="switchPage('recipe')"><span class="icon">📖</span><span>レシピ</span></button>
+    <button class="nav-btn" onclick="switchPage('ingredient')"><span class="icon">🥗</span><span>食材</span></button>
+    <button class="nav-btn" onclick="switchPage('goal')"><span class="icon">🎯</span><span>目標</span></button>
+  </nav>
+
+  <section id="page-weight" class="page active">
+    <div class="card">
+      <div class="card-title">⚖️ 体重を記録する</div>
+      <div class="form-row">
+        <div><label class="field-label">日付</label><input type="date" id="w-date"></div>
+        <div><label class="field-label">体重 (kg)</label><input type="number" id="w-kg" step="0.1" placeholder="68.5"></div>
+      </div>
+      <button class="btn btn-green btn-full" onclick="saveWeight()">📥 記録する</button>
+    </div>
+    <div class="card"><div class="card-title">📈 体重グラフ</div><div class="chart-wrap"><canvas id="weightChart"></canvas></div></div>
+    <div class="card"><div class="card-title">🗂️ 履歴一覧</div><div id="weight-list" class="data-list"></div></div>
+  </section>
+
+  <section id="page-meal" class="page">
+    <div class="card">
       <div class="card-title">🍽️ 食事を記録する</div>
       <div class="form-row">
         <div>
@@ -25,24 +161,281 @@
           </div>
           <div style="padding-bottom: 10px; width: 25px; font-size: 14px; color: var(--muted); font-weight: bold;" id="mealUnitLabel">g</div>
         </div>
-        <div>
-          <label class="field-label">kcal</label>
-          <input type="number" id="m-cal" placeholder="0" step="0.1">
-        </div>
+        <div><label class="field-label">kcal</label><input type="number" id="m-cal" placeholder="0" step="0.1"></div>
       </div>
       <div class="form-row">
-        <div>
-          <label class="field-label">P タンパク質 (g)</label>
-          <input type="number" id="m-p" placeholder="0" step="0.1">
-        </div>
-        <div>
-          <label class="field-label">F 脂質 (g)</label>
-          <input type="number" id="m-f" placeholder="0" step="0.1">
-        </div>
-        <div>
-          <label class="field-label">C 炭水化物 (g)</label>
-          <input type="number" id="m-c" placeholder="0" step="0.1">
-        </div>
+        <div><label class="field-label">P タンパク質 (g)</label><input type="number" id="m-p" placeholder="0" step="0.1"></div>
+        <div><label class="field-label">F 脂質 (g)</label><input type="number" id="m-f" placeholder="0" step="0.1"></div>
+        <div><label class="field-label">C 炭水化物 (g)</label><input type="number" id="m-c" placeholder="0" step="0.1"></div>
       </div>
       <button class="btn btn-orange btn-full" onclick="saveMeal()">📥 記録する</button>
     </div>
+
+    <div class="card">
+      <div class="card-title">📊 当日の合計 <span id="meal-date-label" style="font-size:13px;font-weight:400;color:var(--muted)"></span></div>
+      <div class="pfc-bar">
+        <div class="pfc-pill pfc-k"><div class="pfc-val" id="t-cal">—</div><div class="pfc-lbl">kcal</div></div>
+        <div class="pfc-pill pfc-p"><div class="pfc-val" id="t-p">—</div><div class="pfc-lbl">タンパク質 g</div></div>
+        <div class="pfc-pill pfc-f"><div class="pfc-val" id="t-f">—</div><div class="pfc-lbl">脂質 g</div></div>
+        <div class="pfc-pill pfc-c"><div class="pfc-val" id="t-c">—</div><div class="pfc-lbl">炭水化物 g</div></div>
+      </div>
+      <div id="goal-progress"></div>
+      <div class="chart-wrap-sm"><canvas id="pfcChart"></canvas></div>
+    </div>
+    <div class="card"><div class="card-title">🗂️ 当日の食事履歴</div><div id="meal-list" class="data-list"></div></div>
+  </section>
+
+  <section id="page-recipe" class="page">
+    <div class="card">
+      <div class="card-title">✏️ 新しいレシピを作成</div>
+      <div class="form-row"><div><label class="field-label">レシピ名</label><input type="text" id="r-title" placeholder="例: 鶏むね肉の塩麹焼き"></div></div>
+      <label class="field-label">使用する食材</label>
+      <div id="r-ing-container"></div>
+      <button class="btn btn-ghost btn-sm" style="margin-bottom:12px" onclick="addIngRow()">＋ 食材を追加</button>
+      <label class="field-label">作り方・メモ</label>
+      <textarea id="r-instructions" placeholder="手順やメモを書く..."></textarea>
+      <div style="margin-top:12px"><button class="btn btn-purple btn-full" onclick="saveRecipe()">💾 保存する（PFC自動計算）</button></div>
+    </div>
+    <div class="card"><div class="card-title">📔 マイレシピ一覧</div><div id="recipe-list"></div></div>
+  </section>
+
+  <section id="page-ingredient" class="page">
+    <div class="card">
+      <div class="card-title">➕ 食材を登録する</div>
+      <div class="form-row">
+        <div><label class="field-label">食材名</label><input type="text" id="i-name" placeholder="例: 鶏むね肉"></div>
+        <div><label class="field-label">単位</label><select id="i-unit"><option value="g">g (100gあたり)</option><option value="個">個 (1個あたり)</option></select></div>
+      </div>
+      <div class="form-row">
+        <div><label class="field-label">kcal</label><input type="number" id="i-cal" placeholder="108" step="0.1"></div>
+        <div><label class="field-label">P (g)</label><input type="number" id="i-p" placeholder="22.3" step="0.1"></div>
+        <div><label class="field-label">F (g)</label><input type="number" id="i-f" placeholder="1.5" step="0.1"></div>
+        <div><label class="field-label">C (g)</label><input type="number" id="i-c" placeholder="0" step="0.1"></div>
+      </div>
+      <button class="btn btn-blue btn-full" onclick="saveIngredient()">📥 登録する</button>
+    </div>
+    <div class="card"><div class="card-title">🥗 食材マスター一覧</div><div id="ingredient-list" class="data-list"></div></div>
+  </section>
+
+  <section id="page-goal" class="page">
+    <div class="card">
+      <div class="card-title">🎯 1日の目標を設定する</div>
+      <div class="goal-grid">
+        <div><label class="field-label">目標kcal</label><input type="number" id="g-cal" placeholder="2000"></div>
+        <div><label class="field-label">P (g)</label><input type="number" id="g-p" placeholder="150"></div>
+        <div><label class="field-label">F (g)</label><input type="number" id="g-f" placeholder="60"></div>
+        <div><label class="field-label">C (g)</label><input type="number" id="g-c" placeholder="250"></div>
+      </div>
+      <div style="margin-top:14px"><button class="btn btn-green btn-full" onclick="saveGoal()">💾 保存する</button></div>
+    </div>
+    <div class="card" style="border:2px solid #f1c40f">
+      <div class="card-title">🔍 食材からレシピを探す</div>
+      <div class="form-row"><select id="search-ing-select" onchange="searchRecipes()"><option value="">— 冷蔵庫にある食材を選択 —</option></select></div>
+      <div id="proposal-list"><div class="empty">食材を選ぶとレシピを提案します</div></div>
+    </div>
+  </section>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+let globalIngredients = [];
+let globalRecipes = [];
+let globalGoal = null;
+let weightChart, pfcChart;
+let selectedIngBase = null; 
+let currentSelectedType = null; 
+let isManualOverride = false;
+
+const today = new Date().toISOString().split('T')[0];
+
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.background = isError ? '#c0392b' : '#2c3e50';
+  el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2800);
+}
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
+function v(id) { return document.getElementById(id); }
+function fv(id) { return parseFloat(v(id).value) || 0; }
+function sv(id) { return v(id).value.trim(); }
+
+function progressBar(label, val, max, color) {
+  if (!max) return '';
+  const pct = Math.min(100, Math.round(val / max * 100));
+  return `<div class="progress-wrap"><div class="progress-label"><span>${label}</span><span>${val.toFixed(1)} / ${max} (${pct}%)</span></div>
+  <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${val > max ? '#e74c3c' : color}"></div></div></div>`;
+}
+
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  v(`page-${name}`).classList.add('active');
+  const idx = ['weight','meal','recipe','ingredient','goal'].indexOf(name);
+  document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if (name === 'weight') loadWeightPage();
+  if (name === 'meal') loadMealPage();
+  if (name === 'recipe') loadRecipePage();
+  if (name === 'ingredient') loadIngredientPage();
+  if (name === 'goal') loadGoalPage();
+}
+
+async function loadWeightPage() {
+  const data = await api('/weights/');
+  const sorted = [...data].sort((a,b) => a.date > b.date ? 1 : -1);
+  v('weight-list').innerHTML = sorted.length ? [...sorted].reverse().map(item => `<div class="data-item"><div class="item-main">📅 <strong>${item.date}</strong> &nbsp; ${item.weight} kg</div><button class="btn btn-red btn-sm" onclick="deleteWeight(${item.id})">削除</button></div>`).join('') : '<div class="empty">まだ記録がありません</div>';
+  const ctx = v('weightChart').getContext('2d');
+  if (weightChart) weightChart.destroy();
+  weightChart = new Chart(ctx, { type: 'line', data: { labels: sorted.map(d => d.date), datasets: [{ label: '体重 (kg)', data: sorted.map(d => d.weight), borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,.15)', borderWidth: 2, tension: 0.3 }] }, options: { scales: { x: { type: 'time', time: { unit: 'day' } } }, plugins: { legend: { display: false } } } });
+}
+async function saveWeight() { const d = sv('w-date'), kg = sv('w-kg'); if (!d || !kg) return toast('入力が足りません', true); await api('/weights/', 'POST', { date: d, weight: parseFloat(kg) }); toast('✅ 記録しました'); loadWeightPage(); }
+async function deleteWeight(id) { if (!confirm('削除しますか？')) return; await api(`/weights/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadWeightPage(); }
+
+// 💡 検索とスマート計算ロジック
+async function loadMealPage() {
+  if (!v('m-date').value) v('m-date').value = today;
+  const d = v('m-date').value; v('meal-date-label').textContent = d;
+  const meals = await api(`/meal_histories/?date=${d}`);
+  v('meal-list').innerHTML = meals.length ? meals.map(m => `<div class="data-item"><div class="item-main"><strong>${m.name}</strong> ${m.amount_g}${m.amount_g % 1 === 0 ? 'g' : ''}<div class="item-sub">${m.calories.toFixed(0)}kcal ／ P${m.protein.toFixed(1)} F${m.fat.toFixed(1)} C${m.carbs.toFixed(1)}</div></div><button class="btn btn-red btn-sm" onclick="deleteMeal(${m.id})">削除</button></div>`).join('') : '<div class="empty">記録はありません</div>';
+  
+  const cal = meals.reduce((s, m) => s + (m.calories||0), 0), p = meals.reduce((s, m) => s + (m.protein||0), 0), f = meals.reduce((s, m) => s + (m.fat||0), 0), c = meals.reduce((s, m) => s + (m.carbs||0), 0);
+  v('t-cal').textContent = cal.toFixed(0); v('t-p').textContent = p.toFixed(1); v('t-f').textContent = f.toFixed(1); v('t-c').textContent = c.toFixed(1);
+  v('goal-progress').innerHTML = globalGoal ? progressBar('kcal', cal, globalGoal.calories, '#27ae60') + progressBar('タンパク質', p, globalGoal.protein, '#2980b9') + progressBar('脂質', f, globalGoal.fat, '#e74c3c') + progressBar('炭水化物', c, globalGoal.carbs, '#e67e22') : '';
+  
+  const ctx = v('pfcChart').getContext('2d');
+  if (pfcChart) pfcChart.destroy();
+  pfcChart = new Chart(ctx, { type: 'doughnut', data: { labels: [`P: ${p.toFixed(1)}g`, `F: ${f.toFixed(1)}g`, `C: ${c.toFixed(1)}g`], datasets: [{ data: [p,f,c], backgroundColor: ['#2980b9','#e74c3c','#e67e22'] }] }, options: { plugins: { legend: { position: 'bottom' } } } });
+}
+
+function handleSearchInput() {
+  const q = sv('m-name').toLowerCase(), box = v('search-suggestions');
+  if (!q) { box.style.display = 'none'; return; }
+  box.innerHTML = '';
+  globalIngredients.filter(i => i.name.toLowerCase().includes(q)).forEach(ing => {
+      const li = document.createElement('li'); li.className = 'data-item'; li.style.cursor = 'pointer';
+      li.innerHTML = `🥗 <span style="flex:1; margin-left:8px;">${ing.name}</span> <span class="item-sub">(${ing.unit})</span>`;
+      li.onclick = () => selectIngredient(ing); box.appendChild(li);
+  });
+  globalRecipes.filter(r => r.title.toLowerCase().includes(q)).forEach(rec => {
+      const li = document.createElement('li'); li.className = 'data-item'; li.style.cursor = 'pointer';
+      li.innerHTML = `🍳 <span style="flex:1; margin-left:8px;">${rec.title}</span>`;
+      li.onclick = () => selectRecipe(rec); box.appendChild(li);
+  });
+  box.style.display = box.children.length ? 'block' : 'none';
+}
+
+function selectIngredient(ing) {
+  currentSelectedType = 'ingredient'; selectedIngBase = ing;
+  v('m-name').value = ing.name; v('search-suggestions').style.display = 'none'; v('recipe-adjust-area').style.display = 'none';
+  v('mealUnitLabel').textContent = ing.unit; v('m-amount').value = ing.unit === 'g' ? 100 : 1;
+  isManualOverride = false; recalcMealPFC();
+}
+
+function selectRecipe(rec) {
+  currentSelectedType = 'recipe'; selectedIngBase = null;
+  v('m-name').value = rec.title; v('search-suggestions').style.display = 'none';
+  const adjustList = v('recipe-adjust-list'); adjustList.innerHTML = '';
+  rec.ingredients.forEach(ri => {
+      const div = document.createElement('div'); div.className = 'form-row';
+      div.innerHTML = `<span style="flex:2;font-size:13px;margin-top:10px;">${ri.ingredient.name}</span><input type="number" class="adj-amount" data-id="${ri.ingredient.id}" value="${ri.amount}" style="flex:1;"><span style="font-size:13px;margin-top:10px;">${ri.ingredient.unit}</span>`;
+      div.querySelector('.adj-amount').addEventListener('input', recalcAdjustedRecipe); adjustList.appendChild(div);
+  });
+  v('recipe-adjust-area').style.display = 'block'; v('mealUnitLabel').textContent = 'g (総量)';
+  isManualOverride = false; recalcAdjustedRecipe();
+}
+
+function recalcMealPFC() {
+  if (isManualOverride || currentSelectedType !== 'ingredient' || !selectedIngBase) return;
+  const factor = selectedIngBase.unit === 'g' ? fv('m-amount') / 100 : fv('m-amount');
+  v('m-cal').value = (selectedIngBase.calories * factor).toFixed(1); v('m-p').value = (selectedIngBase.protein * factor).toFixed(1); v('m-f').value = (selectedIngBase.fat * factor).toFixed(1); v('m-c').value = (selectedIngBase.carbs * factor).toFixed(1);
+}
+
+function recalcAdjustedRecipe() {
+  if (isManualOverride || currentSelectedType !== 'recipe') return;
+  let tCal=0, tP=0, tF=0, tC=0, tAmt=0;
+  document.querySelectorAll('.adj-amount').forEach(inp => {
+      const amt = parseFloat(inp.value)||0, ing = globalIngredients.find(i => i.id === parseInt(inp.getAttribute('data-id')));
+      if(!ing) return;
+      const factor = ing.unit === 'g' ? amt/100 : amt;
+      tCal += ing.calories*factor; tP += ing.protein*factor; tF += ing.fat*factor; tC += ing.carbs*factor; tAmt += amt;
+  });
+  v('m-amount').value = tAmt; v('m-cal').value = tCal.toFixed(1); v('m-p').value = tP.toFixed(1); v('m-f').value = tF.toFixed(1); v('m-c').value = tC.toFixed(1);
+}
+
+['m-cal', 'm-p', 'm-f', 'm-c'].forEach(id => v(id).addEventListener('input', () => isManualOverride = true));
+document.addEventListener('click', e => { if (!e.target.closest('#m-name') && !e.target.closest('#search-suggestions')) v('search-suggestions').style.display = 'none'; });
+
+async function saveMeal() {
+  if (!sv('m-name')) return toast('食べたものを入力してください', true);
+  await api('/meal_histories/', 'POST', { date: sv('m-date')||today, name: sv('m-name'), amount_g: fv('m-amount')||1, calories: fv('m-cal'), protein: fv('m-p'), fat: fv('m-f'), carbs: fv('m-c') });
+  toast('✅ 記録しました');
+  ['m-name','m-cal','m-p','m-f','m-c'].forEach(id => v(id).value = ''); v('m-amount').value = '100';
+  v('recipe-adjust-area').style.display = 'none'; currentSelectedType = null; loadMealPage();
+}
+async function deleteMeal(id) { if (!confirm('削除しますか？')) return; await api(`/meals/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadMealPage(); }
+async function logRecipeAsMeal(id) {
+  const r = globalRecipes.find(x => x.id === id); if(!r) return;
+  await api('/meal_histories/', 'POST', { date: sv('m-date')||today, name: r.title, amount_g: 1, calories: r.total_calories, protein: r.total_protein, fat: r.total_fat, carbs: r.total_carbs });
+  toast(`✅ 記録しました`);
+}
+
+function addIngRow() {
+  const row = document.createElement('div'); row.className = 'ing-row';
+  row.innerHTML = `<select class="r-ing-id">${globalIngredients.map(i => `<option value="${i.id}">${i.name} (${i.unit})</option>`).join('')}</select><input type="number" class="r-ing-amt" placeholder="分量" value="100"><button class="btn btn-red btn-sm" onclick="this.parentElement.remove()">✕</button>`;
+  v('r-ing-container').appendChild(row);
+}
+async function saveRecipe() {
+  if (!sv('r-title')) return toast('レシピ名を入力してください', true);
+  const ingredients = Array.from(document.querySelectorAll('.ing-row')).map(r => ({ ingredient_id: parseInt(r.querySelector('.r-ing-id').value), amount: parseFloat(r.querySelector('.r-ing-amt').value) })).filter(x => x.ingredient_id && x.amount);
+  await api('/recipes/', 'POST', { title: sv('r-title'), instructions: sv('r-instructions'), ingredients });
+  toast('✅ 保存しました'); v('r-title').value = ''; v('r-instructions').value = ''; v('r-ing-container').innerHTML = ''; addIngRow();
+  globalRecipes = await api('/recipes/'); loadRecipePage();
+}
+async function deleteRecipe(id) { if(!confirm('削除しますか？')) return; await api(`/recipes/${id}`, 'DELETE'); toast('🗑️ 削除しました'); globalRecipes = await api('/recipes/'); loadRecipePage(); }
+async function loadRecipePage() {
+  v('recipe-list').innerHTML = globalRecipes.length ? globalRecipes.map(r => `<div class="recipe-card"><div class="recipe-card-title">🍳 ${r.title}</div><div class="recipe-card-pfc">🔥 ${r.total_calories.toFixed(0)} kcal ／ P: ${r.total_protein.toFixed(1)}g ／ F: ${r.total_fat.toFixed(1)}g ／ C: ${r.total_carbs.toFixed(1)}g</div><div class="recipe-card-ings">📦 ${r.ingredients.map(ri => `${ri.ingredient.name}: ${ri.amount}${ri.ingredient.unit}`).join('、') || '食材なし'}</div><div class="recipe-card-actions"><button class="btn btn-orange btn-sm" onclick="logRecipeAsMeal(${r.id})">🍽️ 今日食べた</button><button class="btn btn-red btn-sm" onclick="deleteRecipe(${r.id})">🗑️ 削除</button></div></div>`).join('') : '<div class="empty">レシピがありません</div>';
+}
+
+async function saveIngredient() {
+  if (!sv('i-name')) return toast('食材名を入力してください', true);
+  await api('/ingredients/', 'POST', { name: sv('i-name'), unit: sv('i-unit'), calories: fv('i-cal'), protein: fv('i-p'), fat: fv('i-f'), carbs: fv('i-c') });
+  toast('✅ 登録しました'); ['i-name','i-cal','i-p','i-f','i-c'].forEach(id => v(id).value = '');
+  await refreshIngredients(); loadIngredientPage();
+}
+async function deleteIngredient(id) { if(!confirm('削除しますか？')) return; await api(`/ingredients/${id}`, 'DELETE'); toast('🗑️ 削除しました'); await refreshIngredients(); loadIngredientPage(); }
+function loadIngredientPage() {
+  v('ingredient-list').innerHTML = globalIngredients.length ? globalIngredients.map(i => `<div class="data-item"><div class="item-main"><strong>${i.name}</strong><div class="item-sub">${i.unit==='g'?'100g':'1個'}あたり：${i.calories.toFixed(0)}kcal</div></div><button class="btn btn-red btn-sm" onclick="deleteIngredient(${i.id})">削除</button></div>`).join('') : '<div class="empty">登録されていません</div>';
+}
+
+async function loadGoalPage() {
+  if (globalGoal) { v('g-cal').value = globalGoal.calories; v('g-p').value = globalGoal.protein; v('g-f').value = globalGoal.fat; v('g-c').value = globalGoal.carbs; }
+  v('search-ing-select').innerHTML = '<option value="">— 食材を選択 —</option>' + globalIngredients.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
+}
+async function saveGoal() { await api('/goals/', 'POST', { calories: fv('g-cal'), protein: fv('g-p'), fat: fv('g-f'), carbs: fv('g-c') }); toast('✅ 保存しました'); globalGoal = await api('/goals/'); }
+function searchRecipes() {
+  const id = v('search-ing-select').value; if (!id) return;
+  const matched = globalRecipes.filter(r => r.ingredients.some(ri => ri.ingredient_id == id));
+  v('proposal-list').innerHTML = matched.length ? matched.map(r => `<div class="proposal-card"><div class="proposal-title">💡 ${r.title}</div><div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:6px">🔥 ${r.total_calories.toFixed(0)} kcal</div><button class="btn btn-orange btn-sm" onclick="logRecipeAsMeal(${r.id})">🍽️ 今日食べた</button></div>`).join('') : '<div class="empty">レシピがありません</div>';
+}
+
+async function refreshIngredients() {
+  globalIngredients = await api('/ingredients/');
+  document.querySelectorAll('.r-ing-id').forEach(sel => { const cur = sel.value; sel.innerHTML = globalIngredients.map(i => `<option value="${i.id}"${i.id==cur?' selected':''}>${i.name} (${i.unit})</option>`).join(''); });
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  v('w-date').value = today; v('m-date').value = today;
+  globalGoal = await api('/goals/').catch(() => null);
+  globalRecipes = await api('/recipes/').catch(() => []);
+  await refreshIngredients();
+  loadWeightPage(); addIngRow();
+});
+</script>
+</body>
+</html>
