@@ -10,10 +10,10 @@
 <style>
   :root {
     --green:   #27ae60; --green-lt: #eafaf1; --green-dk: #1e8449;
-    --orange:  #f1c40f; --orange-lt: #fef9e7; /* 脂質用の黄色 */
+    --orange:  #f1c40f; --orange-lt: #fef9e7;
     --purple:  #8e44ad; --purple-lt: #f5eef8;
-    --blue:    #3498db; --blue-lt:   #ebf5fb; /* 炭水化物用の青 */
-    --red:     #e74c3c; --red-lt:    #fdedec; /* タンパク質用の赤 */
+    --blue:    #3498db; --blue-lt:   #ebf5fb;
+    --red:     #e74c3c; --red-lt:    #fdedec;
     --text:    #2c3e50; --muted: #7f8c8d; --border: #e5e8ed;
     --bg:      #f0f3f7; --card:  #fff;
     --radius:  12px; --shadow: 0 2px 8px rgba(0,0,0,.08);
@@ -36,7 +36,6 @@
   .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
   .form-row > * { flex: 1; min-width: 100px; }
   
-  /* ✨ スマホ対応：分量調整エリアの改行絶対阻止用CSS */
   .adj-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: nowrap; }
   .adj-row span { white-space: nowrap; font-size: 13px; }
   .adj-row input { width: 70px; flex-shrink: 0; padding: 6px; text-align: center; }
@@ -49,12 +48,10 @@
   .btn { padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: transform .1s; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
   .btn:active { transform: scale(.97); }
   .btn-green  { background: var(--green);  color: #fff; }
-  .btn-orange { background: #f39c12; color: #fff; } /* 脂質調整 */
+  .btn-orange { background: #f39c12; color: #fff; }
   .btn-purple { background: var(--purple); color: #fff; }
   .btn-blue   { background: var(--blue);   color: #fff; }
   .btn-red    { background: var(--red-lt); color: var(--red); }
-  .btn-red-real { background: var(--red); color: #fff; }
-  .btn-ghost  { background: #f4f5f7; color: var(--text); }
   .btn-sm { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
   .btn-full { width: 100%; display: block; }
   
@@ -72,7 +69,6 @@
   .pfc-pill .pfc-val { font-size: 18px; font-weight: 600; }
   .pfc-pill .pfc-lbl { font-size: 11px; margin-top: 2px; }
   
-  /* ✨ 要望通りの配色指定：P=赤、F=黄、C=青 */
   .pfc-p { background: var(--red-lt); color: var(--red); }
   .pfc-f { background: var(--orange-lt); color: #d4ac0d; }
   .pfc-c { background: var(--blue-lt); color: var(--blue); }
@@ -161,7 +157,7 @@
       <div class="form-row">
         <div style="display: flex; gap: 8px; align-items: flex-end;">
           <div style="flex: 1;"><label class="field-label">量</label><input type="number" id="m-amount" value="100" min="1" oninput="recalcMealPFC()"></div>
-          <div style="padding-bottom: 10px; width: 35px; font-size: 14px; font-weight: bold;" id="mealUnitLabel">g</div>
+          <div style="padding-bottom: 10px; width: 25px; font-size: 14px; font-weight: bold;" id="mealUnitLabel">g</div>
         </div>
         <div><label class="field-label">kcal</label><input type="number" id="m-cal" step="0.1"></div>
       </div>
@@ -178,7 +174,7 @@
       <div class="pfc-bar">
         <div class="pfc-pill pfc-k"><div class="pfc-val" id="t-cal">—</div><div class="pfc-lbl">kcal</div></div>
         <div class="pfc-pill pfc-p"><div class="pfc-val" id="t-p">—</div><div class="pfc-lbl">タンパク質</div></div>
-        <div class="pfc-pill pfc-f"><div class="pfc-val" id="t-f">—</div><div class="pfc-lbl">脂質</div></div>
+        <div class="pfc-pill f pfc-f"><div class="pfc-val" id="t-f">—</div><div class="pfc-lbl">脂質</div></div>
         <div class="pfc-pill pfc-c"><div class="pfc-val" id="t-c">—</div><div class="pfc-lbl">炭水化物</div></div>
       </div>
       <div id="goal-progress"></div>
@@ -212,7 +208,7 @@
         <div><label class="field-label">最低 タンパク質</label><input type="number" id="search-r-p" placeholder="20g 以上..."></div>
         <div><label class="field-label">最高 脂質</label><input type="number" id="search-r-f" placeholder="10g 以内..."></div>
       </div>
-      <button class="btn btn-purple btn-sm" onclick="loadRecipePage()">🔍 この条件で検索・絞り込み</button>
+      <button class="btn btn-purple btn-sm" onclick="refreshRecipesList()">🔍 この条件で検索・絞り込み</button>
     </div>
 
     <div class="card"><div class="card-title">📔 共有レシピ一覧</div><div id="recipe-list"></div></div>
@@ -261,7 +257,7 @@
       </div>
       <div class="btn-group">
         <button class="btn btn-green" onclick="changeGoalChartMode('all')">総合一覧</button>
-        <button class="btn btn-ghost" id="btn-c-cal" onclick="changeGoalChartMode('calories')">カロリー</button>
+        <button class="btn btn-ghost" onclick="changeGoalChartMode('calories')">カロリー</button>
         <button class="btn btn-red" onclick="changeGoalChartMode('protein')">タンパク質(P)</button>
         <button class="btn btn-orange" onclick="changeGoalChartMode('fat')">脂質(F)</button>
         <button class="btn btn-blue" onclick="changeGoalChartMode('carbs')">炭水化物(C)</button>
@@ -274,24 +270,35 @@
 <div id="toast"></div>
 
 <script>
-let SUPABASE_URL = '', SUPABASE_ANON_KEY = '', _supabase = null, sessionToken = null, currentUserId = null;
+let SUPABASE_URL = '', SUPABASE_ANON_KEY = '', _supabase = null, currentUserId = null;
 let globalIngredients = [], globalRecipes = [], globalGoal = null;
 let weightChart, pfcChart, comparisonChart;
 let selectedIngBase = null, currentSelectedType = null, isManualOverride = false;
-let currentGoalChartMode = 'all'; // all, calories, protein, fat, carbs
+let currentGoalChartMode = 'all';
 const today = new Date().toISOString().split('T')[0];
 
 function toast(msg, isError = false) {
-  const el = document.getElementById('toast');el.textContent = msg; el.style.background = isError ? '#c0392b' : '#2c3e50';
+  const el = document.getElementById('toast'); el.textContent = msg; el.style.background = isError ? '#c0392b' : '#2c3e50';
   el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 2800);
 }
+
+// ✨ 魔改造：通信する瞬間に、Supabaseから「常に最新の（期限切れじゃない）トークン」をその場で取得して載せる
 async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  if (sessionToken) Object.assign(opts.headers, { 'Authorization': `Bearer ${sessionToken}` });
+  
+  if (_supabase) {
+    const { data: { session } } = await _supabase.auth.getSession();
+    if (session) {
+      opts.headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  }
+  
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.status === 204 ? null : res.json();
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.status === 204 ? null : res.json();
 }
+
 function v(id) { return document.getElementById(id); }
 function fv(id) { return parseFloat(v(id).value) || 0; }
 function sv(id) { return v(id).value.trim(); }
@@ -318,7 +325,7 @@ function switchPage(name) {
 async function checkSession() {
   const { data: { session } } = await _supabase.auth.getSession();
   if (session) {
-    sessionToken = session.access_token; currentUserId = session.user.id;
+    currentUserId = session.user.id;
     v('auth-screen').style.display = 'none'; v('main-app').style.display = 'block'; initializeApp();
   } else {
     v('auth-screen').style.display = 'flex'; v('main-app').style.display = 'none';
@@ -334,7 +341,7 @@ async function handleSignup() {
   const { error } = await _supabase.auth.signUp({ email, password }); if(error) return toast('登録失敗: ' + error.message, true);
   toast('✅ 登録成功！ログインしました'); checkSession();
 }
-async function handleLogout() { await _supabase.auth.signOut(); sessionToken = null; location.reload(); }
+async function handleLogout() { await _supabase.auth.signOut(); location.reload(); }
 
 async function loadWeightPage() {
   const data = await api('/weights/'); const sorted = [...data].sort((a,b) => a.date > b.date ? 1 : -1);
@@ -386,7 +393,7 @@ function selectRecipe(rec) {
   v('m-name').value = rec.title; v('search-suggestions').style.display = 'none';
   const adjustList = v('recipe-adjust-list'); adjustList.innerHTML = '';
   rec.ingredients.forEach(ri => {
-      const div = document.createElement('div'); div.className = 'adj-row'; // ✨ 横一行に絶対収めるクラス
+      const div = document.createElement('div'); div.className = 'adj-row';
       div.innerHTML = `<span style="flex:2;">${ri.ingredient.name}</span><input type="number" class="adj-amount" data-id="${ri.ingredient.id}" value="${ri.amount}"><span>${ri.ingredient.unit}</span>`;
       div.querySelector('.adj-amount').addEventListener('input', recalcAdjustedRecipe); adjustList.appendChild(div);
   });
@@ -436,17 +443,13 @@ function addIngRow() {
 async function saveRecipe() {
   if (!sv('r-title')) return toast('レシピ名を入力してください', true);
   const ingredients = Array.from(document.querySelectorAll('.ing-row')).map(r => ({ ingredient_id: parseInt(r.querySelector('.r-ing-id').value), amount: parseFloat(r.querySelector('.r-ing-amt').value) })).filter(x => x.ingredient_id && x.amount);
-  
-  // カンマ区切りのタグを配列化
   const rawTags = sv('r-tags') ? sv('r-tags').split(',') : [];
-  
   await api('/recipes/', 'POST', { title: sv('r-title'), instructions: sv('r-instructions'), ingredients, tags: rawTags });
   toast('✅ レシピを全体公開で共有しました！'); v('r-title').value = ''; v('r-instructions').value = ''; v('r-tags').value = ''; v('r-ing-container').innerHTML = ''; addIngRow();
   await refreshRecipesList();
 }
 
 async function refreshRecipesList() {
-  // ✨ 超高度な多機能検索パラメータの組み立て
   let url = '/recipes/?';
   if (sv('search-r-title')) url += `title=${encodeURIComponent(sv('search-r-title'))}&`;
   if (v('search-r-ing').value) url += `ingredient_id=${v('search-r-ing').value}&`;
@@ -454,16 +457,13 @@ async function refreshRecipesList() {
   if (sv('search-r-cal')) url += `max_cal=${sv('search-r-cal')}&`;
   if (sv('search-r-p')) url += `min_p=${sv('search-r-p')}&`;
   if (sv('search-r-f')) url += `max_f=${sv('search-r-f')}&`;
-  
   globalRecipes = await api(url); loadRecipePage();
 }
 
 async function deleteRecipe(id) { if(!confirm('削除しますか？')) return; await api(`/recipes/${id}`, 'DELETE').catch(() => { toast('他人が作成したレシピは削除できません', true); }); toast('🗑️ 削除しました'); refreshRecipesList(); }
 
 async function loadRecipePage() {
-  // 検索プルダウンの同期
   v('search-r-ing').innerHTML = '<option value="">— 食材指定なし —</option>' + globalIngredients.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
-  
   v('recipe-list').innerHTML = globalRecipes.length ? globalRecipes.map(r => {
     const isMine = r.user_id === currentUserId;
     const tagHtml = r.tags.map(t => `<span class="tag-badge">#${t.name}</span>`).join('');
@@ -489,11 +489,9 @@ async function saveIngredient() {
 }
 async function deleteIngredient(id) { if(!confirm('削除しますか？')) return; await api(`/ingredients/${id}`, 'DELETE').catch(() => { toast('公式/他人の食材は削除できません', true); }); toast('🗑️ 削除しました'); await refreshIngredients(); renderIngredientListOnly(); }
 
-// ✨ 魔改造：検索キーワードのフィルタリングと、PFCを全表示する食材マスタリスト
 function renderIngredientListOnly() {
   const kw = sv('search-ing-keyword').toLowerCase();
   const filtered = globalIngredients.filter(i => i.name.toLowerCase().includes(kw));
-  
   v('ingredient-list').innerHTML = filtered.length ? filtered.map(i => {
     const isMine = i.user_id === currentUserId;
     const infoText = (i.unit === 'g' || i.unit === 'ml') ? `100${i.unit}あたり` : `1${i.unit}あたり`;
@@ -519,25 +517,18 @@ async function loadGoalPage() {
 }
 async function saveGoal() { await api('/goals/', 'POST', { calories: fv('g-cal'), protein: fv('g-p'), fat: fv('g-f'), carbs: fv('g-c') }); toast('✅ 保存しました'); globalGoal = await api('/goals/'); updateGoalChart(); }
 
-function changeGoalChartMode(mode) {
-  currentGoalChartMode = mode;
-  updateGoalChart();
-}
+function changeGoalChartMode(mode) { currentGoalChartMode = mode; updateGoalChart(); }
 
-// ✨ 大進化：アナリティクス2連棒グラフ比較描画システム
 async function updateGoalChart() {
   const targetDate = v('goal-chart-date').value || today;
   const meals = await api(`/meal_histories/?date=${targetDate}`);
-  
   const actual = {
     cal: meals.reduce((s, m) => s + (m.calories||0), 0),
     p: meals.reduce((s, m) => s + (m.protein||0), 0),
     f: meals.reduce((s, m) => s + (m.fat||0), 0),
     c: meals.reduce((s, m) => s + (m.carbs||0), 0)
   };
-  
   const goal = globalGoal ? { cal: globalGoal.calories, p: globalGoal.protein, f: globalGoal.fat, c: globalGoal.carbs } : { cal:2000, p:150, f:60, c:250 };
-  
   let chartLabels = [], goalData = [], actualData = [], bgColorsGoal = [], bgColorsActual = [];
   
   if (currentGoalChartMode === 'all' || currentGoalChartMode === 'calories') {
@@ -557,9 +548,7 @@ async function updateGoalChart() {
     bgColorsGoal.push('rgba(52, 152, 212, 0.3)'); bgColorsActual.push('rgba(52, 152, 212, 0.9)');
   }
 
-  const ctx = v('comparisonChart').getContext('2d');
-  if (comparisonChart) comparisonChart.destroy();
-  
+  const ctx = v('comparisonChart').getContext('2d'); if (comparisonChart) comparisonChart.destroy();
   comparisonChart = new Chart(ctx, {
     type: 'bar',
     data: {
