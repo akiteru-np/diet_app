@@ -58,6 +58,11 @@
   .btn-purple { background: var(--purple); color: #fff; }
   .btn-blue   { background: var(--blue);   color: #fff; }
   .btn-red    { background: var(--red-lt); color: var(--red); }
+  
+  /* ✨ 指摘反映：btn-ghost が抜けていたのを復活 */
+  .btn-ghost  { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { background: #f8f9fa; }
+
   .btn-sm { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
   .btn-full { width: 100%; display: block; }
   
@@ -115,7 +120,6 @@
   .ing-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
   
   @keyframes modalOpen { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  
   .ai-loading { animation: pulse 1.5s infinite ease-in-out; opacity: 0.6; pointer-events: none; }
   @keyframes pulse { 0% { opacity:0.4; } 50% { opacity:1; } 100% { opacity:0.4; } }
 </style>
@@ -237,7 +241,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title">✏️ 新しいレシピを作成 (共有設定)</div>
+      <div class="card-title">✏️ 新しいレシピを作成</div>
       <div class="form-row"><div><label class="field-label">レシピ名</label><input type="text" id="r-title" placeholder="例: 鶏むね肉の塩麹焼き"></div></div>
       
       <div class="form-row" style="position: relative;">
@@ -279,12 +283,12 @@
       <button class="btn btn-purple btn-sm" onclick="refreshRecipesList()">🔍 この条件で検索・絞り込み</button>
     </div>
 
-    <div class="card"><div class="card-title">📔 共有レシピ一覧</div><div id="recipe-list"></div></div>
+    <div class="card"><div class="card-title">📔 レシピ一覧</div><div id="recipe-list"></div></div>
   </section>
 
   <section id="page-ingredient" class="page">
     <div class="card">
-      <div class="card-title">➕ 新しい食材を登録する (共有設定)</div>
+      <div class="card-title">➕ 新しい食材を登録する</div>
       <div class="form-row">
         <div style="flex: 2;"><label class="field-label">食材名</label><input type="text" id="i-name" placeholder="例: しょうゆ、鶏もも肉、卵"></div>
         <div style="flex: 1; display: flex; align-items: flex-end; padding-bottom: 2px;">
@@ -308,7 +312,7 @@
       <input type="text" id="search-ing-keyword" placeholder="登録済みの食材名を入力してください..." oninput="renderIngredientListOnly()">
     </div>
 
-    <div class="card"><div class="card-title">🥗 共有食材マスター一覧</div><div id="ingredient-list" class="data-list"></div></div>
+    <div class="card"><div class="card-title">🥗 食材マスター一覧</div><div id="ingredient-list" class="data-list"></div></div>
   </section>
 
   <section id="page-goal" class="page">
@@ -356,7 +360,9 @@ let weightChart, pfcChart, comparisonChart;
 let selectedIngBase = null, currentSelectedType = null, isManualOverride = false;
 let selectedRecipeIngredients = [];
 let currentGoalChartMode = 'all';
-const today = new Date().toISOString().split('T')[0];
+
+// ✨ 指摘反映：日本時間（UTC+9）ベースで安全に「今日」を取得
+const today = new Date().toLocaleDateString('sv-SE');
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -397,7 +403,7 @@ async function triggerAIIngredientPrediction() {
     v('i-c').value = res.carbs;
     toast(`✅ AIが「${name}」の単位とPFC情報を自動算出しました！`);
   } catch(e) {
-    toast(`AI予測に失敗しました。キー設定を確認してください。`, true);
+    toast(`AI予測に失敗しました: ${e.message}`, true);
   } finally {
     btn.classList.remove('ai-loading'); btn.textContent = '🧠 AIデータ自動検索';
   }
@@ -420,7 +426,6 @@ async function importRecipeViaAI() {
   
   try {
     const aiResult = await api('/api/ai/analyze-recipe', 'POST', { text: textVal, url: urlVal, image_base64: imgB64 });
-    
     v('r-title').value = aiResult.title;
     v('r-instructions').value = aiResult.instructions;
     
@@ -428,7 +433,7 @@ async function importRecipeViaAI() {
     toast(`🍳 料理「${aiResult.title}」を解析。食材マスタとの同期を開始...`);
     
     for(const aiIng of aiResult.ingredients) {
-      let matched = globalIngredients.find(x => x.name.toLowerCase() === aiIng.name.toLowerCase());
+      let matched = globalIngredients.find(x => x.name === aiIng.name);
       if(!matched) {
         try {
           const pred = await api(`/api/ai/predict-ingredient?name=${encodeURIComponent(aiIng.name)}`);
@@ -485,10 +490,7 @@ function switchPage(name) {
   if (name === 'weight') loadWeightPage();
   if (name === 'text-meal') loadMealPage();
   if (name === 'recipe') loadRecipePage();
-  
-  // ✨ 今回の修正（これが抜けていました）
   if (name === 'ingredient') loadIngredientPage();
-  
   if (name === 'goal') loadGoalPage();
 }
 
@@ -524,7 +526,7 @@ async function loadWeightPage() {
   weightChart = new Chart(ctx, { type: 'line', data: { labels: sorted.map(d => d.date), datasets: [{ label: '体重 (kg)', data: sorted.map(d => d.weight), borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,.15)', borderWidth: 2, tension: 0.3 }] }, options: { scales: { x: { type: 'time', time: { unit: 'day' } } }, plugins: { legend: { display: false } } } });
 }
 async function saveWeight() { const d = sv('w-date'), kg = sv('w-kg'); if (!d || !kg) return toast('入力が足りません', true); await api('/weights/', 'POST', { date: d, weight: parseFloat(kg) }); toast('✅ 記録しました'); loadWeightPage(); }
-async function deleteWeight(id) { if(!confirm('この体重記録を削除しますか？')) return; await api(`/weights/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadWeightPage(); }
+async function deleteWeight(id) { if(!confirm('この体重記録を削除しますか？')) return; await api(`/weights/${id}`, 'DELETE').catch(e => toast(e.message, true)); toast('🗑️ 削除しました'); loadWeightPage(); }
 
 function syncVisibleCalToHidden() { v('m-cal').value = v('m-cal-visible').value; }
 
@@ -608,7 +610,14 @@ async function saveMeal() {
   toast('✅ 記録しました'); ['m-name','m-cal','m-cal-visible','m-p','m-f','m-c'].forEach(id => v(id).value = ''); v('m-amount').value = '100';
   v('recipe-adjust-area').style.display = 'none'; currentSelectedType = null; loadMealPage();
 }
-async function deleteMeal(id) { if (!confirm('削除しますか？')) return; await api(`/meals/${id}`, 'DELETE'); toast('🗑️ 削除しました'); loadMealPage(); }
+async function deleteMeal(id) { if (!confirm('削除しますか？')) return; await api(`/meals/${id}`, 'DELETE').catch(e => toast(e.message, true)); toast('🗑️ 削除しました'); loadMealPage(); }
+
+// ✨ 指摘反映：完全に脱落していた logRecipeAsMeal 関数を復活！
+async function logRecipeAsMeal(id) {
+  const r = globalRecipes.find(x => x.id === id); if(!r) return;
+  await api('/meal_histories/', 'POST', { date: v('m-date').value || today, name: r.title, amount_g: 100, calories: r.total_calories, protein: r.total_protein, fat: r.total_fat, carbs: r.total_carbs });
+  toast(`✅ 「${r.title}」の食事記録を追加しました`); loadMealPage();
+}
 
 function handleRecipeIngSearchInput() {
   const q = sv('r-ing-search').toLowerCase(), box = v('recipe-ing-suggestions'); if (!q) { box.style.display = 'none'; return; }
@@ -694,7 +703,19 @@ async function refreshRecipesList() {
   globalRecipes = await api(url); loadRecipePage();
 }
 
-async function deleteRecipe(id) { if(!confirm('削除しますか？')) return; await api(`/recipes/${id}`, 'DELETE'); toast('🗑️ 削除しました'); refreshRecipesList(); }
+// ✨ 指摘反映：削除後にフィルターを強制リセットして再取得するように修正
+async function deleteRecipe(id) { 
+  if(!confirm('削除しますか？')) return; 
+  try {
+    await api(`/recipes/${id}`, 'DELETE');
+    toast('🗑️ 削除しました'); 
+    v('search-r-title').value = ''; v('search-r-ing').value = ''; v('search-r-tag').value = '';
+    v('search-r-cal').value = ''; v('search-r-p').value = ''; v('search-r-f').value = '';
+    await refreshRecipesList();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
 
 async function loadRecipePage() {
   v('search-r-ing').innerHTML = '<option value="">— 食材指定なし —</option>' + globalIngredients.map(i => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('');
@@ -741,9 +762,17 @@ async function saveIngredient() {
   toast('✅ 新しい食材マスタを共有登録しました！'); ['i-name','i-cal','i-p','i-f','i-c'].forEach(id => v(id).value = '');
   await refreshIngredients(); renderIngredientListOnly();
 }
-async function deleteIngredient(id) { if(!confirm('削除しますか？')) return; await api(`/ingredients/${id}`, 'DELETE'); toast('🗑️ 削除しました'); await refreshIngredients(); renderIngredientListOnly(); }
+async function deleteIngredient(id) { 
+  if(!confirm('削除しますか？')) return; 
+  try {
+    await api(`/ingredients/${id}`, 'DELETE');
+    toast('🗑️ 削除しました'); 
+    await refreshIngredients(); renderIngredientListOnly();
+  } catch(e) {
+    toast(e.message, true);
+  }
+}
 
-// ✨ 今回の修正（食材一覧を出すための関数）
 function loadIngredientPage() {
   renderIngredientListOnly();
 }
