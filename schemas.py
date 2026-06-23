@@ -38,10 +38,18 @@ class RecipeIngredientResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# ✨新設：Tagのスキーマ
+class TagResponse(BaseModel):
+    id: int
+    name: str
+    class Config:
+        from_attributes = True
+
 class RecipeCreate(BaseModel):
     title: str
     instructions: str
     ingredients: List[RecipeIngredientCreate] = []
+    tags: List[str] = [] # ✨追加: ["ダイエット", "高タンパク"] のような文字列の配列を受け取る
 
 class RecipeResponse(BaseModel):
     id: int
@@ -49,6 +57,7 @@ class RecipeResponse(BaseModel):
     title: str
     instructions: str
     ingredients: List[RecipeIngredientResponse] = []
+    tags: List[TagResponse] = [] # ✨追加: レシピと一緒にタグ一覧も返す
     total_calories: float = 0.0
     total_protein: float = 0.0
     total_fat: float = 0.0
