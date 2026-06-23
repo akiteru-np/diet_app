@@ -1,0 +1,20 @@
+{
+  "name": "目指せ理想のBody",
+  "short_name": "理想のBody",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0f3f7",
+  "theme_color": "#27ae60",
+  "icons": [
+    {
+      "src": "/static/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

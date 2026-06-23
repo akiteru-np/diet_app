@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles # ✨ 画像を読み込むための機能
 from sqlalchemy.orm import Session
 from datetime import date as date_type
 from typing import Optional
@@ -22,6 +23,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ✨ アイコンなどを置くstaticフォルダを認識させる
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
@@ -65,13 +70,12 @@ def read_root():
     path = os.path.join(BASE_DIR, "templates", "index.html")
     with open(path, "r", encoding="utf-8") as f: return f.read()
 
-# ✨ 新設：登録されているすべてのタグ一覧を返すAPI（サジェスト用）
 @app.get("/tags/", response_model=list[str])
 def read_tags(db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     tags = db.query(models.Tag).all()
     return [t.name for t in tags]
 
-# ── 1. Weight ──────────────────────────────────────
+# ── 以下、前回と同じAPI群（Weights, Ingredients, Recipes, Meals, Goals） ──
 @app.post("/weights/", response_model=schemas.WeightResponse)
 def create_weight(weight_data: schemas.WeightCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     existing = db.query(models.Weight).filter(models.Weight.user_id == user_id, models.Weight.date == weight_data.date).first()
@@ -91,7 +95,6 @@ def delete_weight(weight_id: int, db: Session = Depends(get_db), user_id: str = 
     if not db_weight: raise HTTPException(status_code=404)
     db.delete(db_weight); db.commit(); return {"status": "success"}
 
-# ── 2. Ingredient ──────────────────────────────────
 @app.post("/ingredients/", response_model=schemas.IngredientResponse)
 def create_ingredient(ingredient_data: schemas.IngredientCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_ingredient = models.Ingredient(user_id=user_id, **ingredient_data.dict())
@@ -107,7 +110,6 @@ def delete_ingredient(ingredient_id: int, db: Session = Depends(get_db), user_id
     if not db_ingredient: raise HTTPException(status_code=404)
     db.delete(db_ingredient); db.commit(); return {"status": "success"}
 
-# ── 3. Recipe ──────────────────────────────────────
 def calc_recipe_totals(r):
     total_cal = total_p = total_f = total_c = 0.0
     for ri in r.ingredients:
@@ -125,11 +127,9 @@ def calc_recipe_totals(r):
 def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_recipe = models.Recipe(user_id=user_id, title=recipe_data.title, instructions=recipe_data.instructions)
     db.add(db_recipe); db.commit(); db.refresh(db_recipe)
-    
     for ing_part in recipe_data.ingredients:
         db_ri = models.RecipeIngredient(recipe_id=db_recipe.id, ingredient_id=ing_part.ingredient_id, amount=ing_part.amount)
         db.add(db_ri)
-        
     unique_tag_names = list(set([t.strip() for t in recipe_data.tags if t.strip()]))
     for tag_name in unique_tag_names:
         if tag_name.startswith("#"): tag_name = tag_name[1:]
@@ -138,34 +138,25 @@ def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_d
             tag = models.Tag(name=tag_name)
             db.add(tag); db.commit(); db.refresh(tag)
         db_recipe.tags.append(tag)
-        
     db.commit(); db.refresh(db_recipe); return calc_recipe_totals(db_recipe)
 
 @app.get("/recipes/", response_model=list[schemas.RecipeResponse])
 def read_recipes(
-    title: Optional[str] = Query(None),
-    ingredient_id: Optional[int] = Query(None),
-    tag: Optional[str] = Query(None),
-    max_cal: Optional[float] = Query(None),
-    min_p: Optional[float] = Query(None),
-    max_f: Optional[float] = Query(None),
-    max_c: Optional[float] = Query(None),
-    db: Session = Depends(get_db), 
-    user_id: str = Depends(get_current_user)
+    title: Optional[str] = Query(None), ingredient_id: Optional[int] = Query(None),
+    tag: Optional[str] = Query(None), max_cal: Optional[float] = Query(None),
+    min_p: Optional[float] = Query(None), max_f: Optional[float] = Query(None),
+    max_c: Optional[float] = Query(None), db: Session = Depends(get_db), user_id: str = Depends(get_current_user)
 ):
     query = db.query(models.Recipe)
     if title: query = query.filter(models.Recipe.title.contains(title))
     if ingredient_id: query = query.join(models.Recipe.ingredients).filter(models.RecipeIngredient.ingredient_id == ingredient_id)
     if tag: query = query.join(models.Recipe.tags).filter(models.Tag.name == tag)
-    
     recipes = query.all()
     calculated = [calc_recipe_totals(r) for r in recipes]
-    
     if max_cal is not None: calculated = [r for r in calculated if r.total_calories <= max_cal]
     if min_p is not None: calculated = [r for r in calculated if r.total_protein >= min_p]
     if max_f is not None: calculated = [r for r in calculated if r.total_fat <= max_f]
     if max_c is not None: calculated = [r for r in calculated if r.total_carbs <= max_c]
-    
     return calculated
 
 @app.delete("/recipes/{recipe_id}")
@@ -174,7 +165,6 @@ def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = 
     if not db_recipe: raise HTTPException(status_code=404)
     db.delete(db_recipe); db.commit(); return {"status": "success"}
 
-# ── 4. MealHistory ─────────────────────────────────
 @app.post("/meal_histories/", response_model=schemas.MealHistoryResponse)
 def create_meal_history(meal_data: schemas.MealHistoryCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_meal = models.MealHistory(user_id=user_id, **meal_data.dict())
@@ -192,7 +182,6 @@ def delete_meal(meal_id: int, db: Session = Depends(get_db), user_id: str = Depe
     if not db_meal: raise HTTPException(status_code=404)
     db.delete(db_meal); db.commit(); return {"status": "success"}
 
-# ── 5. Goal ────────────────────────────────────────
 @app.get("/goals/", response_model=Optional[schemas.GoalResponse])
 def read_goal(db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     return db.query(models.Goal).filter(models.Goal.user_id == user_id).first()
