@@ -2,17 +2,16 @@ from pydantic import BaseModel
 from datetime import date
 from typing import List, Optional
 
-# 1. Weight (体重)
 class WeightCreate(BaseModel):
     date: date
     weight: float
 
 class WeightResponse(WeightCreate):
     id: int
+    user_id: str
     class Config:
         from_attributes = True
 
-# 2. Ingredient (食材マスター)
 class IngredientCreate(BaseModel):
     name: str
     calories: float
@@ -23,10 +22,10 @@ class IngredientCreate(BaseModel):
 
 class IngredientResponse(IngredientCreate):
     id: int
+    user_id: Optional[str] = None
     class Config:
         from_attributes = True
 
-# 中間テーブル用
 class RecipeIngredientCreate(BaseModel):
     ingredient_id: int
     amount: float
@@ -39,7 +38,6 @@ class RecipeIngredientResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# 3. Recipe (レシピマスター)
 class RecipeCreate(BaseModel):
     title: str
     instructions: str
@@ -47,6 +45,7 @@ class RecipeCreate(BaseModel):
 
 class RecipeResponse(BaseModel):
     id: int
+    user_id: str
     title: str
     instructions: str
     ingredients: List[RecipeIngredientResponse] = []
@@ -57,7 +56,6 @@ class RecipeResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# 4. MealHistory (食事履歴)
 class MealHistoryCreate(BaseModel):
     date: date
     name: str
@@ -69,10 +67,10 @@ class MealHistoryCreate(BaseModel):
 
 class MealHistoryResponse(MealHistoryCreate):
     id: int
+    user_id: str
     class Config:
         from_attributes = True
 
-# 5. 目標PFC設定
 class GoalCreate(BaseModel):
     calories: float
     protein: float
@@ -81,5 +79,6 @@ class GoalCreate(BaseModel):
 
 class GoalResponse(GoalCreate):
     id: int
+    user_id: str
     class Config:
         from_attributes = True
