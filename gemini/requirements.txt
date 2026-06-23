@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-sqlalchemy
-pydantic
-psycopg2-binary
-jinja2
