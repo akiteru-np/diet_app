@@ -5,17 +5,19 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import date as date_type
 from typing import Optional
-import jwt  # ✨追加：暗号解読ツール
+import jwt  # PyJWT
 import models, schemas
 from database import engine, SessionLocal
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-security = HTTPBearer() # ✨追加：APIの入り口に立つ警備員
+security = HTTPBearer()
 
-# 環境変数からJWT Secretを取得（設定されていなければエラー防止のダミーを入れる）
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "dummy_secret")
+# ✨ 新方式：すでにRenderにある「SUPABASE_URL」から自動的にDiscovery URLを組み立てる
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL)
 
 def get_db():
     db = SessionLocal()
@@ -24,12 +26,21 @@ def get_db():
     finally:
         db.close()
 
-# 👑 本物のログイン認証（Supabase JWTトークンの検証）
+# 👑 本物のログイン認証（最新のES256 / JWKS自動検証版）
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> str:
     token = credentials.credentials
     try:
-        # Supabaseが発行した「身分証明書」が本物か、秘密の鍵でチェック！
-        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
+        # 1. Supabaseの公開鍵をURLからオンデマンドで自動取得
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        
+        # 2. 最新の暗号アルゴリズム「ES256」でパスポートを検証！
+        payload = jwt.decode(
+            token, 
+            signing_key.key, 
+            algorithms=["ES256"], 
+            options={"verify_aud": False}
+        )
+        
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="無効なトークンです")
@@ -44,16 +55,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         return user_id
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="トークンの有効期限が切れています")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="無効なトークンです")
-
-# フロントエンドにRenderの環境変数から安全なキーだけを貸し出す
-@app.get("/auth/config")
-def get_auth_config():
-    return {
-        "supabase_url": os.environ.get("SUPABASE_URL", ""),
-        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", "")
-    }
+    except Exception as e:
+        # 何らかの理由で検証エラーになった場合
+        raise HTTPException(status_code=401, detail=f"認証に失敗しました: {str(e)}")
 
 # ── ルート ──────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
