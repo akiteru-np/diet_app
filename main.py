@@ -84,7 +84,7 @@ def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=400, detail="Renderの環境変数にGEMINI_API_KEYが設定されていません")
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     食材名「{name}」について、日本の自炊レシピにおける一般的な使われ方を考慮し、最も適合する単位（g, 個, ml）を1つ選択してください。
@@ -146,7 +146,7 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=400, detail="Renderの環境変数にGEMINI_API_KEYが設定されていません")
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
     
     prompt = """
     提供された情報（料理の画像、レシピテキスト、サイトURLから抽出した内容など）を徹底的に解析し、以下のJSONフォーマットに従ってレシピ情報を抽出してください。
