@@ -115,7 +115,7 @@ def ai_predict_ingredient(name: str, user_id: str = Depends(get_current_user)):
         res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=12)
         if res.status_code != 200:
             raise HTTPException(status_code=500, detail=f"Gemini APIエラー: {res.text}")
-        text_res = res.json()['contents'][0]['parts'][0]['text']
+        text_res = res.json()['candidates'][0]['content']['parts'][0]['text']
         return json.loads(text_res)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI予測エラー: {str(e)}")
@@ -185,7 +185,7 @@ def ai_analyze_recipe(req: RecipeAIRequest, user_id: str = Depends(get_current_u
         res = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=25)
         if res.status_code != 200:
             raise HTTPException(status_code=500, detail=f"Gemini APIエラー: {res.text}")
-        text_res = res.json()['contents'][0]['parts'][0]['text']
+        text_res = res.json()['candidates'][0]['content']['parts'][0]['text']
         return json.loads(text_res)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"{str(e)}")
@@ -224,10 +224,21 @@ def delete_ingredient(ingredient_id: int, db: Session = Depends(get_db), user_id
     if not db_ingredient: raise HTTPException(status_code=404)
     db.delete(db_ingredient); db.commit(); return {"status": "success"}
 
-def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
-    db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id).first()
-    if not db_recipe: raise HTTPException(status_code=404)
-    db.delete(db_recipe); db.commit(); return {"status": "success"}
+def calc_recipe_totals(recipe: models.Recipe) -> schemas.RecipeResponse:
+    total_cal = total_p = total_f = total_c = 0.0
+    for ri in recipe.ingredients:
+        ing = ri.ingredient
+        ratio = ri.amount / 100.0 if ing.unit in ("g", "ml") else ri.amount
+        total_cal += (ing.calories or 0) * ratio
+        total_p   += (ing.protein  or 0) * ratio
+        total_f   += (ing.fat      or 0) * ratio
+        total_c   += (ing.carbs    or 0) * ratio
+    result = schemas.RecipeResponse.from_orm(recipe)
+    result.total_calories = round(total_cal, 1)
+    result.total_protein  = round(total_p,   1)
+    result.total_fat      = round(total_f,   1)
+    result.total_carbs    = round(total_c,   1)
+    return result
 
 @app.post("/recipes/", response_model=schemas.RecipeResponse)
 def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
@@ -267,7 +278,9 @@ def read_recipes(
 
 @app.delete("/recipes/{recipe_id}")
 def delete_recipe_endpoint(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
-    return delete_recipe(recipe_id, db, user_id)
+    db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id, models.Recipe.user_id == user_id).first()
+    if not db_recipe: raise HTTPException(status_code=404)
+    db.delete(db_recipe); db.commit(); return {"status": "success"}
 
 @app.post("/meal_histories/", response_model=schemas.MealHistoryResponse)
 def create_meal_history(meal_data: schemas.MealHistoryCreate, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
