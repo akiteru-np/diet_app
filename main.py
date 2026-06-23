@@ -1,12 +1,11 @@
-
 import os
+import requests  # ✨ 魔法の通信ツール
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import date as date_type
 from typing import Optional
-import jwt  # PyJWT
 import models, schemas
 from database import engine, SessionLocal
 
@@ -16,8 +15,7 @@ app = FastAPI()
 security = HTTPBearer()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_JWKS_URL = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
-jwks_client = jwt.PyJWKClient(SUPABASE_JWKS_URL)
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 def get_db():
     db = SessionLocal()
@@ -26,29 +24,54 @@ def get_db():
     finally:
         db.close()
 
+# 👑 究極のログイン認証（Supabase公式サーバー直接問い合わせ方式）
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> str:
     token = credentials.credentials
+    
+    # Supabaseの認証システムへ、直接パスポートの確認をリクエストする
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "apikey": SUPABASE_ANON_KEY
+    }
+    
     try:
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
-        payload = jwt.decode(token, signing_key.key, algorithms=["ES256"], options={"verify_aud": False})
-        user_id = payload.get("sub")
-        if not user_id: raise HTTPException(status_code=401, detail="無効なトークンです")
+        # Supabase公式のユーザー確認エンドポイントを叩く
+        res = requests.get(f"{SUPABASE_URL.rstrip('/')}/auth/v1/user", headers=headers, timeout=5)
+        
+        # 200番（成功）以外が返ってきたら、偽物か期限切れのトークンなので弾く
+        if res.status_code != 200:
+            raise HTTPException(status_code=401, detail="無効なトークンです")
+            
+        user_data = res.json()
+        user_id = user_data.get("id")
+        email = user_data.get("email", "")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="ユーザーIDの取得に失敗しました")
+            
+        # ユーザーがDBに存在するか確認（初めてのログインなら自動的にユーザー登録）
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user:
-            user = models.User(id=user_id, email=payload.get("email", ""))
+            user = models.User(id=user_id, email=email)
             db.add(user)
             db.commit()
+            
         return user_id
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"認証に失敗しました: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"認証通信エラー: {str(e)}")
 
+# ── 安全なキー貸し出し窓口 ──────────────────────────
 @app.get("/auth/config")
 def get_auth_config():
     return {
-        "supabase_url": os.environ.get("SUPABASE_URL", ""),
-        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY", "")
+        "supabase_url": SUPABASE_URL,
+        "supabase_anon_key": SUPABASE_ANON_KEY
     }
 
+# ── ルート ──────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 @app.head("/")
 def read_root():
@@ -84,14 +107,12 @@ def create_ingredient(ingredient_data: schemas.IngredientCreate, db: Session = D
 
 @app.get("/ingredients/", response_model=list[schemas.IngredientResponse])
 def read_ingredients(db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
-    # ✨他アカウントと共有：全員の食材をすべて取得できるように変更
     return db.query(models.Ingredient).all()
 
 @app.delete("/ingredients/{ingredient_id}")
 def delete_ingredient(ingredient_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_ingredient = db.query(models.Ingredient).filter(models.Ingredient.id == ingredient_id).first()
     if not db_ingredient: raise HTTPException(status_code=404)
-    # ✨自分が作ったものだけ削除可能
     if db_ingredient.user_id and db_ingredient.user_id != user_id:
         raise HTTPException(status_code=403, detail="他人が登録した食材は削除できません")
     db.delete(db_ingredient); db.commit(); return {"status": "success"}
@@ -115,16 +136,14 @@ def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_d
     db_recipe = models.Recipe(user_id=user_id, title=recipe_data.title, instructions=recipe_data.instructions)
     db.add(db_recipe); db.commit(); db.refresh(db_recipe)
     
-    # 食材の紐付け
     for ing_part in recipe_data.ingredients:
         db_ri = models.RecipeIngredient(recipe_id=db_recipe.id, ingredient_id=ing_part.ingredient_id, amount=ing_part.amount)
         db.add(db_ri)
         
-    # ✨タグの紐付けロジック
     for tag_name in recipe_data.tags:
         tag_name = tag_name.strip()
         if not tag_name: continue
-        if tag_name.startswith("#"): tag_name = tag_name[1:] # #を勝手に削る優しさ
+        if tag_name.startswith("#"): tag_name = tag_name[1:]
         
         tag = db.query(models.Tag).filter(models.Tag.name == tag_name).first()
         if not tag:
@@ -134,7 +153,6 @@ def create_recipe(recipe_data: schemas.RecipeCreate, db: Session = Depends(get_d
         
     db.commit(); db.refresh(db_recipe); return calc_recipe_totals(db_recipe)
 
-# ✨ レシピの超高度な一括検索 API へ魔改造
 @app.get("/recipes/", response_model=list[schemas.RecipeResponse])
 def read_recipes(
     title: Optional[str] = Query(None),
@@ -148,13 +166,11 @@ def read_recipes(
     user_id: str = Depends(get_current_user)
 ):
     query = db.query(models.Recipe)
-    
     if title: query = query.filter(models.Recipe.title.contains(title))
     if ingredient_id: query = query.join(models.Recipe.ingredients).filter(models.RecipeIngredient.ingredient_id == ingredient_id)
     if tag: query = query.join(models.Recipe.tags).filter(models.Tag.name == tag)
     
     recipes = query.all()
-    # メモリ上で計算してPFC・カロリーフィルターを適用
     calculated = [calc_recipe_totals(r) for r in recipes]
     
     if max_cal is not None: calculated = [r for r in calculated if r.total_calories <= max_cal]
@@ -168,7 +184,6 @@ def read_recipes(
 def delete_recipe(recipe_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_current_user)):
     db_recipe = db.query(models.Recipe).filter(models.Recipe.id == recipe_id).first()
     if not db_recipe: raise HTTPException(status_code=404)
-    # ✨自分が作ったものだけ削除可能
     if db_recipe.user_id != user_id:
         raise HTTPException(status_code=403, detail="他人が作成したレシピは削除できません")
     db.delete(db_recipe); db.commit(); return {"status": "success"}
